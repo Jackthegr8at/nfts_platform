@@ -20,10 +20,10 @@ import { collectionTabs } from '@utils/collectionTabs';
 import { Modal } from '@components/Modal';
 import { Header } from '@components/Header';
 
+
 import { appName } from '@configs/globalsConfig';
 import { usePermission } from '@hooks/usePermission';
 import { handlePreview } from '@utils/handlePreview';
-
 interface ModalProps {
   title: string;
   message?: string;
@@ -62,11 +62,11 @@ function EditTemplate({
     isError: false,
   });
 
-  const [images, setImages] = useState([]);
-
-  useEffect(() => {
-    handlePreview(template, setImages);
-  }, [template]);
+  const image =
+    template.immutable_data.img ||
+    template.immutable_data.image ||
+    template.immutable_data.glbthumb;
+  const video = template.immutable_data.video;
 
   const enableLock = Number(template.issued_supply) > 0;
 
@@ -96,7 +96,7 @@ function EditTemplate({
 
       modalRef.current?.openModal();
       const title = 'Template was successfully locked';
-      const message = 'Please wait while we redirect you.';
+      const message = 'Please await while we redirect you.';
 
       setModal({
         title,
@@ -158,7 +158,7 @@ function EditTemplate({
         ]}
       >
         <Header.Content title={template.name} />
-        <Header.Banner images={images} />
+        <Header.Banner imageIpfs={image} videoIpfs={video} />
       </Header.Root>
 
       <Modal ref={modalRef} title={modal.title}>
@@ -213,9 +213,8 @@ function EditTemplate({
           ) : (
             <button
               type="submit"
-              className={`btn w-fit whitespace-nowrap ${
-                isSaved && 'animate-pulse bg-emerald-600'
-              }`}
+              className={`btn w-fit whitespace-nowrap ${isSaved && 'animate-pulse bg-emerald-600'
+                }`}
               onClick={handleSubmit}
               disabled={!enableLock}
             >

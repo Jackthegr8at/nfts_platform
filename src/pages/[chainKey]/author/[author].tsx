@@ -4,7 +4,7 @@ import {
   listCollectionsService,
   CollectionProps,
 } from '@services/collection/listCollectionsService';
-import { ipfsEndpoint, appName } from '@configs/globalsConfig';
+import { ipfsEndpoint, ipfsGateway, chainKeyDefault, appName } from '@configs/globalsConfig';
 
 import { Card } from '@components/Card';
 import { CardContainer } from '@components/CardContainer';
@@ -37,9 +37,9 @@ export default function CollectionByAuthor({
             <Card
               key={index}
               href={`/${chainKey}/collection/${collection.collection_name}`}
-              image={collection.img ? `${ipfsEndpoint}/${collection.img}` : ''}
+              image={collection.img ? `${ipfsGateway}/${collection.img}` : ''}
               title={collection.name}
-              subtitle={`by ${collection.author}`}
+              subtitle={`Fee ${(collection.market_fee * 100).toFixed(2)}%`}
             />
           ))}
         </CardContainer>

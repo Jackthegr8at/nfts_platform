@@ -40,8 +40,8 @@ function Plugin({ ual, plugin, type, collection, chainKey }: PluginProps) {
             `/${chainKey}/collection/${collection.collection_name}`,
           ],
           [
-            collectionTabs[5].name,
-            `/${chainKey}/collection/${collection.collection_name}?tab=${collectionTabs[5].key}`,
+            collectionTabs[7].name,
+            `/${chainKey}/collection/${collection.collection_name}?tab=${collectionTabs[7].key}`,
           ],
           [plugin],
         ]}

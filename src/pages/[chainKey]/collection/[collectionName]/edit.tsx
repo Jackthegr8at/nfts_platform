@@ -27,11 +27,8 @@ import { Header } from '@components/Header';
 import { Select } from '@components/Select';
 import { Modal } from '@components/Modal';
 
-import { countriesList } from '@utils/countriesList';
-
 const informationValidations = yup.object().shape({
   displayName: yup.string().required().label('Display name'),
-  website: yup.string().url().label('Website'),
   description: yup.string(),
 });
 
@@ -54,9 +51,26 @@ const notificationValidations = yup.object().shape({
 
 interface InformationProps {
   image: File;
+}
+
+interface InformationOnlyProps {
   displayName: string;
   website: string;
   description: string;
+  socials: SocialProps;
+}
+
+interface SocialProps {
+  website?: string;
+  twitter?: string;
+  telegram?: string;
+  discord?: string;
+  instagram?: string;
+  youtube?: string;
+  tikTok?: string;
+  snipcoins?: string;
+  linkedIn?: string;
+  medium?: string;
 }
 
 interface EditCollectionProps {
@@ -99,10 +113,20 @@ function EditCollection({
     isError: false,
   });
 
-  const creatorInfo =
-    collection.data.creator_info && JSON.parse(collection.data.creator_info);
-  const socials =
-    collection.data.socials && JSON.parse(collection.data.socials);
+  const socials = collection.data.url && collection.data.url.includes('\n') ? collection.data.url.split('\n').map((line) => {
+    if (line.includes('https:') || line.includes('www.')) {
+      const colonIndex = line.indexOf(':', line.indexOf('https:') > -1 ? 6 : 5);
+      const platform = line.substring(0, colonIndex);
+      let url = line.substring(colonIndex + 1);
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        url = "https://" + url;
+      }
+      return { platform, url };
+    }
+    return null;
+  }).filter((item) => item !== null) : [];
+
+  //console.log('socials:', socials);
 
   const {
     register,
@@ -139,6 +163,8 @@ function EditCollection({
   });
 
   const image = watch('image');
+  //console.log(image);
+  //console.log(collection.img);
 
   useEffect(() => {
     if (typeof image !== 'string' && image && image.length > 0) {
@@ -184,17 +210,17 @@ function EditCollection({
     );
   }
 
-  async function onSubmitInformation({
+
+  async function onSubmitPicture({
     image,
-    displayName,
-    website,
-    description,
   }: InformationProps) {
     setIsLoading(true);
 
     try {
-      const pinataImage =
-        image[0].length > 0 && (await uploadImageToIpfsService(image[0]));
+      const ipfsData = await uploadImageToIpfsService(image[0]);
+      //console.log('ipfsData:', ipfsData);
+      const imgHash = ipfsData['IpfsHash'];
+      //console.log('imgHash:', imgHash);
 
       const editedInformation = await editCollectionService({
         action: 'setcoldata',
@@ -203,20 +229,107 @@ function EditCollection({
           collection_name: collection.collection_name,
           data: [
             {
-              key: 'name',
-              value: ['string', displayName],
+              key: 'description',
+              value: ['string', collection.data.description],
             },
+            {
+              key: 'name',
+              value: ['string', collection.data.name],
+            },
+            {
+              key: 'img',
+              value: ['string', imgHash],
+            },
+            {
+              key: 'url',
+              value: ['string', collection.data.url],
+            },
+          ],
+        },
+      });
+
+      setIsSaved(true);
+
+      setTimeout(() => {
+        setIsSaved(false);
+      }, 3000);
+    } catch (e) {
+      modalRef.current?.openModal();
+      const jsonError = JSON.parse(JSON.stringify(e));
+      const details = JSON.stringify(e, undefined, 2);
+      const message =
+        jsonError?.cause?.json?.error?.details[0]?.message ??
+        'Unable to edit collection, make sure you added a new image';
+
+      setModal({
+        title: 'Error',
+        message,
+        details,
+        isError: true,
+      });
+    }
+    setIsLoading(false);
+  }
+
+
+  async function onSubmitInformation({
+    displayName,
+    website,
+    description,
+    telegram,
+    twitter,
+    instagram,
+    discord,
+    youtube,
+    linkedIn,
+    tikTok,
+    snipcoins,
+    medium,
+  }: InformationOnlyProps & SocialProps) {
+    setIsLoading(true);
+
+    try {
+      const socialLinks = [
+        { name: 'website', link: website },
+        { name: 'twitter', link: twitter },
+        { name: 'telegram', link: telegram },
+        { name: 'instagram', link: instagram },
+        { name: 'youtube', link: youtube },
+        { name: 'discord', link: discord },
+        { name: 'linkedIn', link: linkedIn },
+        { name: 'tikTok', link: tikTok },
+        { name: 'snipcoins', link: snipcoins },
+        { name: 'medium', link: medium },
+      ];
+
+      const socials = socialLinks
+        .map((link) => {
+          const trimmedLink = link.link ? link.link.trim().replace(/\/+$/, '') : '';
+          return `${link.name}:${trimmedLink}`;
+        })
+        .join('\n');
+
+      const editedInformation = await editCollectionService({
+        action: 'setcoldata',
+        activeUser: ual.activeUser,
+        data: {
+          collection_name: collection.collection_name,
+          data: [
             {
               key: 'description',
               value: ['string', description],
             },
             {
-              key: 'url',
-              value: ['string', website],
+              key: 'name',
+              value: ['string', displayName],
             },
             {
               key: 'img',
-              value: ['string', pinataImage['IpfsHash'] ?? collection.img],
+              value: ['string', collection.img],
+            },
+            {
+              key: 'url',
+              value: ['string', `${socials}\n`],
             },
           ],
         },
@@ -467,7 +580,7 @@ function EditCollection({
 
       modalRef.current?.openModal();
       const title = 'Notifications were forbidden';
-      const message = 'Please wait while we reload the page.';
+      const message = 'Please await while we reload the page.';
 
       setModal({
         title,
@@ -546,6 +659,7 @@ function EditCollection({
 
         <Tab.Group>
           <Tab.List className="tab-list mb-4 md:mb-8">
+            <Tab className="tab">Image</Tab>
             <Tab className="tab">Information</Tab>
             <Tab className="tab">Market Fee</Tab>
             <Tab className="tab">Authorization</Tab>
@@ -553,9 +667,11 @@ function EditCollection({
             <Tab className="tab">Advanced</Tab>
           </Tab.List>
           <Tab.Panels className="container">
+
+
             <Tab.Panel>
               <form
-                onSubmit={handleSubmit(onSubmitInformation)}
+                onSubmit={handleSubmit(onSubmitPicture)}
                 className="flex md:flex-row flex-col gap-8 w-full md:items-start items-center"
               >
                 <div className="flex flex-col">
@@ -591,10 +707,50 @@ function EditCollection({
                   </label>
                 </div>
                 <div className="flex flex-col w-full gap-8">
+
+                  <div className="hidden">
+                    <Input
+                      {...register('displayName')}
+                      error={errors.displayName?.message}
+                      type="text"
+                      defaultValue={collection.data.name}
+                      label="Display Name"
+                    />
+                  </div>
+
+
+                  {isLoading ? (
+                    <span className="flex gap-2 items-center p-4 body-2 font-bold text-white">
+                      <CircleNotch
+                        size={24}
+                        weight="bold"
+                        className="animate-spin"
+                      />
+                      Loading...
+                    </span>
+                  ) : (
+                    <button
+                      type="submit"
+                      className={`btn w-fit ${isSaved && 'animate-pulse bg-emerald-600'
+                        }`}
+                    >
+                      {isSaved ? 'Saved' : 'Update image'}
+                    </button>
+                  )}
+                </div>
+              </form>
+            </Tab.Panel>
+
+            <Tab.Panel>
+              <form
+                onSubmit={handleSubmit(onSubmitInformation)}
+                className="flex md:flex-row flex-col gap-8 w-full md:items-start items-center"
+              >
+                <div className="flex flex-col w-full gap-8">
                   <Input
                     type="text"
                     defaultValue={collection.collection_name}
-                    label="collection Name"
+                    label="Collection Name"
                     readOnly
                     disabled
                     hint="Collection name cannot be edited."
@@ -610,7 +766,7 @@ function EditCollection({
                     {...register('website')}
                     error={errors.website?.message}
                     type="text"
-                    defaultValue={collection.data.url}
+                    defaultValue={socials?.find((item) => item.platform === 'website')?.url ?? ''}
                     label="Website"
                   />
                   <Textarea
@@ -619,7 +775,6 @@ function EditCollection({
                     defaultValue={collection.data.description}
                     label="Description"
                   />
-
                   <div className="flex flex-col gap-8 mt-4">
                     <div className="flex flex-row gap-2 items-baseline">
                       <span className="title-1">Social Media</span>
@@ -628,7 +783,7 @@ function EditCollection({
                     <Controller
                       control={control}
                       name="twitter"
-                      defaultValue={socials?.twitter}
+                      defaultValue={socials?.find((item) => item.platform === 'twitter')?.url ?? ''}
                       render={({ field }) => (
                         <Input
                           label="Twitter"
@@ -644,76 +799,42 @@ function EditCollection({
                     />
                     <Controller
                       control={control}
-                      name="medium"
-                      defaultValue={socials?.medium}
+                      name="telegram"
+                      defaultValue={socials?.find((item) => item.platform === 'telegram')?.url ?? ''}
                       render={({ field }) => (
                         <Input
-                          label="medium"
+                          label="Telegram"
                           value={field.value}
                           onChange={(event) => {
                             const value = handlePrependHttps(event);
                             field.onChange(value);
                           }}
                           type="text"
-                          placeholder="https://medium.com/@username"
+                          placeholder="https://t.me/username"
                         />
                       )}
                     />
                     <Controller
                       control={control}
-                      name="facebook"
-                      defaultValue={socials?.facebook}
+                      name="instagram"
+                      defaultValue={socials?.find((item) => item.platform === 'instagram')?.url ?? ''}
                       render={({ field }) => (
                         <Input
-                          label="Facebook"
+                          label="Instagram"
                           value={field.value}
                           onChange={(event) => {
                             const value = handlePrependHttps(event);
                             field.onChange(value);
                           }}
                           type="text"
-                          placeholder="https://facebook.com/pageurl"
-                        />
-                      )}
-                    />
-                    <Controller
-                      control={control}
-                      name="github"
-                      defaultValue={socials?.github}
-                      render={({ field }) => (
-                        <Input
-                          label="GitHub"
-                          value={field.value}
-                          onChange={(event) => {
-                            const value = handlePrependHttps(event);
-                            field.onChange(value);
-                          }}
-                          type="text"
-                          placeholder="https://github.com/username"
-                        />
-                      )}
-                    />
-                    <Controller
-                      control={control}
-                      name="discord"
-                      defaultValue={socials?.discord}
-                      render={({ field }) => (
-                        <Input
-                          label="Discord"
-                          value={field.value}
-                          onChange={(event) => {
-                            const value = handlePrependHttps(event);
-                            field.onChange(value);
-                          }}
-                          type="text"
-                          placeholder="https://discord.gg/invite/channel"
+                          placeholder="https://www.instagram.com/username"
                         />
                       )}
                     />
                     <Controller
                       control={control}
                       name="youtube"
-                      defaultValue={socials?.youtube}
+                      defaultValue={socials?.find((item) => item.platform === 'youtube')?.url ?? ''}
                       render={({ field }) => (
                         <Input
                           label="Youtube"
@@ -729,85 +850,90 @@ function EditCollection({
                     />
                     <Controller
                       control={control}
-                      name="telegram"
-                      defaultValue={socials?.telegram}
+                      name="discord"
+                      defaultValue={socials?.find((item) => item.platform === 'discord')?.url ?? ''}
                       render={({ field }) => (
                         <Input
-                          label="Telegram"
+                          label="Discord"
                           value={field.value}
                           onChange={(event) => {
                             const value = handlePrependHttps(event);
                             field.onChange(value);
                           }}
                           type="text"
-                          placeholder="https://t.me/username"
+                          placeholder="https://discord.gg/invite/channel"
                         />
                       )}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-8 mt-4">
-                    <div className="flex flex-row gap-2 items-baseline">
-                      <span className="title-1">Company Details</span>
-                      <span className="body-1">(optional)</span>
-                    </div>
-                    <Input
-                      {...register('company')}
-                      label="Company"
-                      type="text"
-                      defaultValue={creatorInfo?.company}
-                      placeholder="e.g: Facings"
-                    />
-                    <Input
-                      {...register('registrationNumber')}
-                      label="Registration number"
-                      type="number"
-                      defaultValue={creatorInfo?.registration_number}
-                      placeholder="e.g: 123456"
-                    />
-                    <Input
-                      {...register('name')}
-                      label="Name of Owner / Managing Director"
-                      type="text"
-                      defaultValue={creatorInfo?.name}
-                      placeholder="e.g: John Doe"
                     />
                     <Controller
                       control={control}
-                      name="country"
-                      defaultValue={creatorInfo?.country}
+                      name="linkedIn"
+                      defaultValue={socials?.find((item) => item.platform === 'linkedIn')?.url ?? ''}
                       render={({ field }) => (
-                        <Select
-                          label="Country"
-                          onChange={field.onChange}
-                          selectedValue={field.value}
-                          options={countriesList}
-                          placeholder="Select a country"
+                        <Input
+                          label="LinkedIn"
+                          value={field.value}
+                          onChange={(event) => {
+                            const value = handlePrependHttps(event);
+                            field.onChange(value);
+                          }}
+                          type="text"
+                          placeholder="https://www.linkedin.com/in/username"
                         />
                       )}
                     />
-                    <Input
-                      {...register('address')}
-                      label="Address"
-                      type="text"
-                      defaultValue={creatorInfo?.address}
-                      placeholder="e.g: Gluthstrasse 8"
+                    <Controller
+                      control={control}
+                      name="tikTok"
+                      defaultValue={socials?.find((item) => item.platform === 'tikTok')?.url ?? ''}
+                      render={({ field }) => (
+                        <Input
+                          label="tikTok"
+                          value={field.value}
+                          onChange={(event) => {
+                            const value = handlePrependHttps(event);
+                            field.onChange(value);
+                          }}
+                          type="text"
+                          placeholder="https://tikTok.com/@username"
+                        />
+                      )}
                     />
-                    <Input
-                      {...register('city')}
-                      label="City"
-                      type="text"
-                      defaultValue={creatorInfo?.city}
-                      placeholder="e.g: Munich"
+                    <Controller
+                      control={control}
+                      name="snipcoins"
+                      defaultValue={socials?.find((item) => item.platform === 'snipcoins')?.url ?? ''}
+                      render={({ field }) => (
+                        <Input
+                          label="Snipcoins"
+                          value={field.value}
+                          onChange={(event) => {
+                            const value = handlePrependHttps(event);
+                            field.onChange(value);
+                          }}
+                          type="text"
+                          placeholder="https://snipcoins.com/username"
+                        />
+                      )}
                     />
-                    <Input
-                      {...register('zipCode')}
-                      label="Zip code / Postal Code"
-                      type="number"
-                      defaultValue={creatorInfo?.zipCode}
-                      placeholder="e.g: 80803"
+                    <Controller
+                      control={control}
+                      name="medium"
+                      defaultValue={socials?.find((item) => item.platform === 'medium')?.url ?? ''}
+                      render={({ field }) => (
+                        <Input
+                          label="Medium"
+                          value={field.value}
+                          onChange={(event) => {
+                            const value = handlePrependHttps(event);
+                            field.onChange(value);
+                          }}
+                          type="text"
+                          placeholder="https://medium.com/@username"
+                        />
+                      )}
                     />
                   </div>
-
                   {isLoading ? (
                     <span className="flex gap-2 items-center p-4 body-2 font-bold text-white">
                       <CircleNotch
@@ -820,9 +946,8 @@ function EditCollection({
                   ) : (
                     <button
                       type="submit"
-                      className={`btn w-fit ${
-                        isSaved && 'animate-pulse bg-emerald-600'
-                      }`}
+                      className={`btn w-fit ${isSaved && 'animate-pulse bg-emerald-600'
+                        }`}
                     >
                       {isSaved ? 'Saved' : 'Update collection'}
                     </button>
@@ -859,9 +984,8 @@ function EditCollection({
                 ) : (
                   <button
                     type="submit"
-                    className={`btn w-fit ${
-                      isSaved && 'animate-pulse bg-emerald-600'
-                    }`}
+                    className={`btn w-fit ${isSaved && 'animate-pulse bg-emerald-600'
+                      }`}
                   >
                     {isSaved ? 'Saved' : 'Update Market Fee'}
                   </button>
@@ -917,9 +1041,8 @@ function EditCollection({
                     ) : (
                       <button
                         type="submit"
-                        className={`btn w-fit whitespace-nowrap ${
-                          isSaved && 'animate-pulse bg-emerald-600'
-                        }`}
+                        className={`btn w-fit whitespace-nowrap ${isSaved && 'animate-pulse bg-emerald-600'
+                          }`}
                       >
                         {isSaved ? 'Saved' : 'Add account'}
                       </button>
@@ -970,9 +1093,8 @@ function EditCollection({
                       ) : (
                         <button
                           type="submit"
-                          className={`btn w-fit whitespace-nowrap ${
-                            isSaved && 'animate-pulse bg-emerald-600'
-                          }`}
+                          className={`btn w-fit whitespace-nowrap ${isSaved && 'animate-pulse bg-emerald-600'
+                            }`}
                         >
                           {isSaved ? 'Saved' : 'Add account'}
                         </button>
@@ -1025,9 +1147,8 @@ function EditCollection({
                     ) : (
                       <button
                         type="submit"
-                        className={`btn w-fit whitespace-nowrap ${
-                          isSaved && 'animate-pulse bg-emerald-600'
-                        }`}
+                        className={`btn w-fit whitespace-nowrap ${isSaved && 'animate-pulse bg-emerald-600'
+                          }`}
                         disabled={collection.notify_accounts.length > 0}
                       >
                         {isSaved ? 'Saved' : 'Forbid Notify'}

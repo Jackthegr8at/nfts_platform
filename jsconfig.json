@@ -10,7 +10,7 @@
       "@contexts/*": ["src/contexts/*"],
       "@services/*": ["src/services/*"],
       "@styles/*": ["src/assets/styles/*"],
-      "@components/*": ["src/components/*"]
+      "@components/*": ["src/components/*"],
     }
   }
 }

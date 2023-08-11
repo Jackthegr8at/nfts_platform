@@ -51,7 +51,7 @@ export function CollectionAccountsList({
   return (
     <section className="container">
       <h2 className="headline-2 my-8 flex items-center gap-2">
-        {collectionTabs[4].name}
+        {collectionTabs[5].name}
       </h2>
 
       {accounts.length > 0 ? (
@@ -60,9 +60,10 @@ export function CollectionAccountsList({
             {accounts.map((account) => (
               <Card
                 key={account.account}
+                href={chainKey === "proton" ? `/${chainKey}/owner/${account.account}` : "#"}
                 image={
                   account.account
-                    ? `https://robohash.org/${account.account}.png?set=set4`
+                    ? `https://api.dicebear.com/5.x/avataaars-neutral/png?seed=${account.account}`
                     : ''
                 }
                 title={account.account}
@@ -70,7 +71,6 @@ export function CollectionAccountsList({
               />
             ))}
           </CardContainer>
-
           {!isEndOfList && (
             <div className="flex justify-center mt-8">
               <SeeMoreButton

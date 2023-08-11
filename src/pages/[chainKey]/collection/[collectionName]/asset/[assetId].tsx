@@ -1,21 +1,42 @@
-import { useEffect, useState } from 'react';
 import { Tab } from '@headlessui/react';
 import Link from 'next/link';
 import Head from 'next/head';
 import { withUAL } from 'ual-reactjs-renderer';
 import { GetServerSideProps } from 'next';
+import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/router';
 
-import { ipfsEndpoint, appName } from '@configs/globalsConfig';
+import { ipfsEndpoint, ipfsGateway, appName, appUrl } from '@configs/globalsConfig';
+
+import { Card } from '@components/Card';
 
 import { getAssetService, AssetProps } from '@services/asset/getAssetService';
 
-import { Card } from '@components/Card';
 import { Header } from '@components/Header';
+import { handlePreview } from '@utils/handlePreview';
 import { Attributes } from '@components/Attributes';
+
+import { Modal } from '@components/Modal';
+import { CircleNotch } from 'phosphor-react';
+import { Disclosure } from '@headlessui/react';
 
 import { isAuthorizedAccount } from '@utils/isAuthorizedAccount';
 import { collectionTabs } from '@utils/collectionTabs';
-import { handlePreview } from '@utils/handlePreview';
+import { fetchNFTPrice } from '@utils/fetchNFTPrice';
+
+import { onSubmit, tokenMapping } from '@services/asset/BuyAssetFunction';
+
+import {
+  Storefront,
+} from 'phosphor-react';
+
+
+interface ModalProps {
+  title: string;
+  message?: string;
+  details?: string;
+  isError?: boolean;
+}
 
 interface AssetViewProps {
   ual: any;
@@ -23,21 +44,95 @@ interface AssetViewProps {
   asset: AssetProps;
 }
 
-function Asset({ ual, chainKey, asset }: AssetViewProps) {
-  const collection = asset.collection;
-  const [images, setImages] = useState([]);
 
-  useEffect(() => {
-    handlePreview(asset, setImages);
-  }, [asset]);
+function Asset({ ual, chainKey, asset }: AssetViewProps) {
+  const image = asset.data.img || asset.data.image || asset.data.glbthumb;
+  const audio = asset.data.song || asset.data.audio;
+  const model = asset.data.model || asset.data.glb;
+  const description = asset.data.desc;
+  const video = asset.data.video;
+  const collection = asset.collection;
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const router = useRouter();
+  const modalRef = useRef(null);
+
+  //console.log(asset);
+
+  const marketasset = [
+    ['Soon.Market', `https://soon.market/nft/templates/${asset.template.template_id}`],
+    ['ProtonMint', `https://protonmint.com/${collection.collection_name}/${asset.template.template_id}`],
+    ['Proton Market', `https://www.protonmarket.com/${collection.collection_name}/${asset.template.template_id}`],
+  ];
 
   const hasAuthorization = isAuthorizedAccount(ual, collection) as boolean;
+
+  const unixTimestamp = Math.floor(Number(asset.minted_at_time) / 1000); // Example Unix timestamp
+  const date = new Date(unixTimestamp * 1000); // Multiply by 1000 to convert back to milliseconds
+  const localMintDateTime = date.toLocaleString(); // Convert to local date time
+
+  const [priceInfo, setPriceInfo] = useState(null);
+  const assetId = asset.asset_id;
+
+  useEffect(() => {
+    fetchNFTPrice(assetId, chainKey).then((fetchedPriceInfo) => {
+      if (fetchedPriceInfo !== null) {
+        setPriceInfo(fetchedPriceInfo);
+        //console.log('the result of priceInfo:',priceInfo);
+      } else {
+        //console.log("NFT price not available");
+      }
+    });
+  }, [assetId, chainKey]);
+
+  const [modal, setModal] = useState<ModalProps>({
+    title: '',
+    message: '',
+    details: '',
+    isError: false,
+  });
+
+  //console.log('the result of priceInfo:',priceInfo);
+
+  const handleSubmit = (priceInfo) => {
+    onSubmit(priceInfo, ual, chainKey, setIsLoading, modalRef, setModal, router);
+  };
 
   return (
     <>
       <Head>
-        <title>{`NFT #${asset.asset_id} - ${appName}`}</title>
+        <meta prefix="og: http://ogp.me/ns#" />
+        <title>{`${asset.name} - ${collection.name}`}</title>
+        <meta name="description" content={description} />
+        <meta property="og:title" content={`${asset.name} - ${collection.name}`} />
+        <meta property="og:description" content={description} />
+        <meta property="og:image" content={`${ipfsEndpoint}/${image}`} />
+        <meta property="og:url" content={appUrl} />
+        <meta name="twitter:image:alt" content={`${asset.name} - ${collection.name}`} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:image" content={`${ipfsEndpoint}/${image}`} />
       </Head>
+
+      <Modal ref={modalRef} title={modal.title}>
+        <p className="body-2 mt-2">{modal.message}</p>
+        {!modal.isError ? (
+          <span className="flex gap-2 items-center py-4 body-2 font-bold text-white">
+            <CircleNotch size={24} weight="bold" className="animate-spin" />
+            Redirecting...
+          </span>
+        ) : (
+          <Disclosure>
+            <Disclosure.Button className="btn btn-small mt-4">
+              Details
+            </Disclosure.Button>
+            <Disclosure.Panel>
+              <pre className="overflow-auto p-4 rounded-lg bg-neutral-700 max-h-96 mt-4">
+                {modal.details}
+              </pre>
+            </Disclosure.Panel>
+          </Disclosure>
+        )}
+      </Modal>
 
       <Header.Root
         breadcrumb={[
@@ -56,17 +151,30 @@ function Asset({ ual, chainKey, asset }: AssetViewProps) {
           [asset.name],
         ]}
       >
-        <Header.Content title={asset.name} subtitle={`NFT #${asset.asset_id}`}>
+        <Header.Content
+          title={asset.name}
+          subtitle={`Asset #${asset.asset_id}`}
+        >
+          <Header.Audio audioIpfs={audio} />
           {hasAuthorization && !asset.burned_by_account && (
             <Link
               href={`/${chainKey}/collection/${collection.collection_name}/asset/${asset.asset_id}/edit`}
-              className="btn mt-4"
+              className="btn mt-4 mr-4"
             >
-              Update NFT
+              Update Asset
             </Link>
           )}
+          {priceInfo && tokenMapping.hasOwnProperty(priceInfo.token) && (
+            <button
+              className={`btn-red mt-4`}
+              onClick={() => handleSubmit(priceInfo)}
+            >
+              Buy Now for {priceInfo.price} {priceInfo.token}
+            </button>
+          )}
         </Header.Content>
-        <Header.Banner images={images} />
+
+        <Header.Banner imageIpfs={image} videoIpfs={video} modelIpfs={model} />
       </Header.Root>
 
       <Tab.Group>
@@ -76,6 +184,9 @@ function Asset({ ual, chainKey, asset }: AssetViewProps) {
           {Object.keys(asset.mutable_data).length > 0 && (
             <Tab className="tab">Mutable data</Tab>
           )}
+          {chainKey !== 'proton-test' && (
+            <Tab className="tab">Proton Market</Tab>
+          )}
         </Tab.List>
         <Tab.Panels className="container">
           <Tab.Panel>
@@ -84,23 +195,26 @@ function Asset({ ual, chainKey, asset }: AssetViewProps) {
                 <Card
                   href={`/${chainKey}/collection/${collection.collection_name}`}
                   image={
-                    collection.img ? `${ipfsEndpoint}/${collection.img}` : ''
+                    collection.img ? `${ipfsGateway}/${collection.img}` : ''
                   }
                   title={collection.name}
                   subtitle={`by ${collection.author}`}
                 />
               </div>
+
               <div className="md:w-1/2 w-full">
                 <div className="w-full md:max-w-sm mx-auto">
                   <div className="flex justify-between py-3 body-2 text-white border-b border-neutral-700">
                     <span>Owner</span>
-                    <span className="font-bold">{asset.owner}</span>
+                    <Link href={`/${chainKey}/owner/${asset.owner}`}>
+                      <a className="text-highlight">{asset.owner}</a>
+                    </Link>
                   </div>
                   <div className="flex justify-between py-3 body-2 text-white border-b border-neutral-700">
                     <span>Mint Number</span>
                     <div>
                       <span className="font-bold pr-2">
-                        {Number(asset.template_mint) > 0
+                        {asset.template_mint !== '0'
                           ? asset.template_mint
                           : 'Minting...'}
                       </span>
@@ -114,17 +228,25 @@ function Asset({ ual, chainKey, asset }: AssetViewProps) {
                       )}
                     </div>
                   </div>
-                  {asset.template && (
-                    <div className="flex justify-between py-3 body-2 text-white border-b border-neutral-700">
-                      <span>Template ID</span>
-                      <Link
-                        href={`/${chainKey}/collection/${collection.collection_name}/template/${asset.template.template_id}`}
-                        className="font-bold underline"
-                      >
-                        {asset.template.template_id}
-                      </Link>
-                    </div>
-                  )}
+                  <>
+                    {asset.template && (
+                      <>
+                        <div className="flex justify-between py-3 body-2 text-white border-b border-neutral-700">
+                          <span>Minted Date</span>
+                          <span className="font-bold">{localMintDateTime}</span>
+                        </div>
+                        <div className="flex justify-between py-3 body-2 text-white border-b border-neutral-700">
+                          <span>Template ID</span>
+                          <Link
+                            href={`/${chainKey}/collection/${collection.collection_name}/template/${asset.template.template_id}`}
+                            className="font-bold underline"
+                          >
+                            {asset.template.template_id}
+                          </Link>
+                        </div>
+                      </>
+                    )}
+                  </>
                   <div className="flex justify-between py-3 body-2 text-white border-b border-neutral-700">
                     <span>Schema</span>
                     <Link
@@ -178,6 +300,29 @@ function Asset({ ual, chainKey, asset }: AssetViewProps) {
                   />
                 ))}
               </Attributes.List>
+            </Tab.Panel>
+          )}
+          {chainKey !== 'proton-test' && (
+            <Tab.Panel>
+              <div className="flex-1">
+                <h3 className="headline-3 mb-4">Proton Markets</h3>
+                {marketasset.map((item, index) => {
+                  return (
+                    <a
+                      key={item[0]}
+                      href={item[1]}
+                      target="_blank"
+                      className="font-bold underline"
+                      rel="noreferrer"
+                    >
+                      <div className="flex justify-start gap-4 py-3 body-2 text-white border-b border-neutral-700">
+                        <Storefront size={24} />
+                        <span className="font-bold">{item[0]}</span>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
             </Tab.Panel>
           )}
         </Tab.Panels>

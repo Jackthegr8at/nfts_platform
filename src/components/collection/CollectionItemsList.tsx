@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MagnifyingGlass } from 'phosphor-react';
-import { ipfsEndpoint } from '@configs/globalsConfig';
+import { ipfsEndpoint, ipfsGateway } from '@configs/globalsConfig';
 import {
   listCollectionsService,
   CollectionProps,
@@ -75,7 +75,7 @@ export function CollectionItemsList({
           <Input
             icon={<MagnifyingGlass size={24} />}
             type="search"
-            placeholder="Search collection"
+            placeholder="Search collection ID"
             onChange={handleSearch}
           />
         </Header.Search>
@@ -90,7 +90,7 @@ export function CollectionItemsList({
                   key={index}
                   href={`/${chainKey}/collection/${collection.collection_name}`}
                   image={
-                    collection.img ? `${ipfsEndpoint}/${collection.img}` : ''
+                    collection.img ? `${ipfsGateway}/${collection.img}` : ''
                   }
                   title={collection.name}
                   subtitle={`by ${collection.author}`}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { ipfsEndpoint } from '@configs/globalsConfig';
+import { ipfsEndpoint, ipfsGateway } from '@configs/globalsConfig';
 import {
   collectionTemplatesService,
   TemplateProps,
@@ -76,19 +76,25 @@ export function CollectionTemplatesList({
                 id={template.template_id}
                 href={`/${chainKey}/collection/${collectionName}/template/${template.template_id}`}
                 image={
-                  template.immutable_data.img
-                    ? `${ipfsEndpoint}/${template.immutable_data.img}`
+                  template.immutable_data.img ||
+                    template.immutable_data.image ||
+                    template.immutable_data.glbthumb
+                    ? `${ipfsGateway}/${template.immutable_data.img ||
+                    template.immutable_data.image ||
+                    template.immutable_data.glbthumb
+                    }`
                     : ''
                 }
                 video={
                   template.immutable_data.video
-                    ? `${ipfsEndpoint}/${template.immutable_data.video}`
+                    ? `${ipfsGateway}/${template.immutable_data.video}`
                     : ''
                 }
                 title={template.name}
-                subtitle={`${template.issued_supply} ${
-                  Number(template.issued_supply) > 1 ? 'NFTs' : 'NFT'
-                }`}
+                subtitle2={`Template #${template.template_id}`}
+                subtitle={`${template.issued_supply} ${Number(template.issued_supply) > 1 ? 'NFTs' : 'NFT'
+                  }`}
+
               />
             ))}
           </CardContainer>

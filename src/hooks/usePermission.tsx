@@ -20,7 +20,7 @@ export function usePermission({
     PermissionDenied: !loggedAccountName
       ? ConnectWallet
       : !isAuthorized
-      ? NotAllowed
-      : null,
+        ? NotAllowed
+        : null,
   };
 }

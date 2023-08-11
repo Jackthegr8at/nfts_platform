@@ -16,6 +16,10 @@ export const collectionTabs = [
     key: 'nfts',
   },
   {
+    name: 'Buy Now',
+    key: 'buynow',
+  },
+  {
     name: 'Accounts',
     key: 'accounts',
   },

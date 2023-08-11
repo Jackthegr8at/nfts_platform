@@ -13,9 +13,14 @@ import { authenticators } from '@libs/authenticators';
 import { blockchains } from '@utils/blockchains';
 import '@utils/yupMethods';
 
-import * as chainsConfig from '@configs/chainsConfig';
+import chainsConfig from '@configs/chainsConfig';
 
 import '@styles/globals.css';
+import Script from 'next/script';
+
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
+import "@styles/slider.css";
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -27,6 +32,12 @@ export default function App({ Component, pageProps }: AppProps) {
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
+      <Script
+        async
+        strategy="afterInteractive"
+        type="module"
+        src="https://unpkg.com/@google/model-viewer@^2.1.1/dist/model-viewer.min.js"
+      />
 
       <UALProvider
         appName={appName}

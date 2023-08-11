@@ -30,15 +30,13 @@ export function Switch({ label, hint, checked, onChange }: SwitchProps) {
         name="isTransferable"
         checked={checked}
         onChange={onChange}
-        className={`flex-none flex items-center h-8 w-14 rounded-full border border-neutral-700 focus:outline-none focus:border-white ${
-          checked ? 'bg-neutral-700' : 'bg-neutral-800'
-        }`}
+        className={`flex-none flex items-center h-8 w-14 rounded-full border border-neutral-700 focus:outline-none focus:border-white ${checked ? 'bg-neutral-700' : 'bg-neutral-800'
+          }`}
       >
         <span className="sr-only">{label}</span>
         <div
-          className={`flex justify-center items-center h-6 w-6 transform rounded-full bg-white text-neutral-900 transition ${
-            checked ? 'translate-x-7' : 'translate-x-1'
-          }`}
+          className={`flex justify-center items-center h-6 w-6 transform rounded-full bg-white text-neutral-900 transition ${checked ? 'translate-x-7' : 'translate-x-1'
+            }`}
         >
           <Transition
             show={checked}

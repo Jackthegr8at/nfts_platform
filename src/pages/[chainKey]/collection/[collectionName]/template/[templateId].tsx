@@ -5,7 +5,7 @@ import { withUAL } from 'ual-reactjs-renderer';
 import Head from 'next/head';
 import { GetServerSideProps } from 'next';
 
-import { ipfsEndpoint, appName } from '@configs/globalsConfig';
+import { ipfsEndpoint, ipfsGateway, chainKeyDefault, appName } from '@configs/globalsConfig';
 
 import { getTemplateService } from '@services/template/getTemplateService';
 import {
@@ -44,6 +44,7 @@ interface TemplateViewProps {
   collection: CollectionProps;
 }
 
+
 function Template({
   ual,
   chainKey,
@@ -52,12 +53,12 @@ function Template({
   schemas,
   templates,
 }: TemplateViewProps) {
+  const image =
+    template.immutable_data.img ||
+    template.immutable_data.image ||
+    template.immutable_data.glbthumb;
+  const video = template.immutable_data.video;
   const collection = template.collection;
-  const [images, setImages] = useState([]);
-
-  useEffect(() => {
-    handlePreview(template, setImages);
-  }, [template]);
 
   const hasAuthorization = isAuthorizedAccount(ual, collection);
 
@@ -91,13 +92,13 @@ function Template({
           {hasAuthorization && (
             <Link
               href={`/${chainKey}/collection/${collection.collection_name}/template/${template.template_id}/edit`}
-              className="btn mt-4 w-fit"
+              className="btn mt-4"
             >
               Lock Template
             </Link>
           )}
         </Header.Content>
-        <Header.Banner images={images} />
+        <Header.Banner imageIpfs={image} videoIpfs={video} />
       </Header.Root>
 
       {hasAuthorization && (
@@ -118,11 +119,11 @@ function Template({
         <Tab.Panels className="container">
           <Tab.Panel>
             <div className="flex flex-col md:flex-row gap-8 lg:gap-0 justify-center">
-              <div className="grid grid-cols-1">
+              <div className="grid grid-cols-1 content-center">
                 <Card
                   href={`/${chainKey}/collection/${collection.collection_name}`}
                   image={
-                    collection.img ? `${ipfsEndpoint}/${collection.img}` : ''
+                    collection.img ? `${ipfsGateway}/${collection.img}` : ''
                   }
                   title={collection.name}
                   subtitle={`by ${collection.author}`}
@@ -219,5 +220,6 @@ export const getServerSideProps: GetServerSideProps = async ({ params }) => {
     };
   }
 };
+
 
 export default withUAL(Template);

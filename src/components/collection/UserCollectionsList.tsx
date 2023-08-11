@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { withUAL } from 'ual-reactjs-renderer';
 import { MagnifyingGlass } from 'phosphor-react';
 
-import { ipfsEndpoint } from '@configs/globalsConfig';
+import { ipfsEndpoint, ipfsGateway } from '@configs/globalsConfig';
 import { listCollectionsService } from '@services/collection/listCollectionsService';
 
 import { Card } from '@components/Card';
@@ -39,7 +39,7 @@ function UserCollectionsListComponent({
   const offset = (currentPage - 1) * limit;
   const isEndOfList = collections.length % limit > 0;
 
-  const author = ual?.activeUser?.accountName;
+  const authorized_account = ual?.activeUser?.accountName;
 
   const handleLoadCollections = useCallback(
     async (page) => {
@@ -50,7 +50,7 @@ function UserCollectionsListComponent({
           match,
           page,
           offset,
-          authorizedAccount: author,
+          authorized_account,
         });
 
         setCollections((state) => [...state, ...data.data]);
@@ -60,14 +60,14 @@ function UserCollectionsListComponent({
 
       setIsLoading(false);
     },
-    [match, author, offset, chainKey]
+    [match, authorized_account, offset, chainKey]
   );
 
   useEffect(() => {
-    if (author && currentPage === 1 && collections.length === 0 && isLoading) {
+    if (authorized_account && currentPage === 1 && collections.length === 0 && isLoading) {
       handleLoadCollections(currentPage);
     }
-  }, [author, currentPage, collections, isLoading, handleLoadCollections]);
+  }, [authorized_account, currentPage, collections, isLoading, handleLoadCollections]);
 
   function handleLogin() {
     ual?.showModal();
@@ -79,21 +79,30 @@ function UserCollectionsListComponent({
 
     const newWaitToSearch = setTimeout(async () => {
       const { data: collections } = await listCollectionsService(chainKey, {
-        match: value || '',
-        authorizedAccount: author,
+        authorized_account,
       });
+
+      // Filter collections based on the search value (either collection_name or name)
+      const filteredCollections = collections.data.filter(
+        (collection) =>
+          collection.collection_name.toLowerCase().includes(value.toLowerCase()) ||
+          collection.name.toLowerCase().includes(value.toLowerCase())
+      );
+
       setMatch(value);
-      setCollections(collections.data);
-    });
+      setCollections(filteredCollections);
+    }, 500);
 
     setWaitToSearch(newWaitToSearch);
   }
 
-  if (author) {
+  //console.log(collections);
+
+  if (authorized_account) {
     return (
       <>
         <Header.Root border>
-          <Header.Content title="My Collections" />
+          <Header.Content title="Authorized Collections" />
           <Header.Search>
             <Input
               icon={<MagnifyingGlass size={24} />}
@@ -117,10 +126,10 @@ function UserCollectionsListComponent({
                     key={index}
                     href={`/${chainKey}/collection/${collection.collection_name}`}
                     image={
-                      collection.img ? `${ipfsEndpoint}/${collection.img}` : ''
+                      collection.img ? `${ipfsGateway}/${collection.img}` : ''
                     }
                     title={collection.name}
-                    subtitle={`by ${collection.author}`}
+                    subtitle={`Created by ${collection.author}`}
                   />
                 ))}
               </CardContainer>
@@ -154,9 +163,9 @@ function UserCollectionsListComponent({
   return (
     <div className="h-[calc(100vh-5.5rem-5.5rem-5.25rem)] md:h-[calc(100vh-5.5rem-5.375rem)] flex items-center justify-center">
       <div className="md:max-w-lg lg:max-w-3xl text-center px-4">
-        <h2 className="headline-1">Explore and manage NFT Collections</h2>
+        <h2 className="headline-1">Explore, manage, and engage with NFT Collections</h2>
         <p className="body-1 mt-4 mb-8">
-          Connect your wallet to see and manage your collections
+          Connect your wallet to buy, sell, transfer, auction, or burn NFTs. Utilize our suite of tools to enhance your collection management experience.
         </p>
         <div className="flex flex-col md:flex-row items-center gap-4 justify-center">
           <button type="button" className="btn" onClick={handleLogin}>

@@ -1,13 +1,12 @@
 interface CardContainerProps {
   children: React.ReactNode;
-  style?: string;
+  additionalStyle?: string;
 }
-export function CardContainer({ children, style }: CardContainerProps) {
+export function CardContainer({ children, additionalStyle }: CardContainerProps) {
+  const baseStyle = 'grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 sm:gap-8';
   return (
     <div
-      className={
-        style || 'grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 sm:gap-8'
-      }
+      className={`${baseStyle} ${additionalStyle}`}
     >
       {children}
     </div>

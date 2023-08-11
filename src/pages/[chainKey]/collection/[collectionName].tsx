@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { Tab } from '@headlessui/react';
 import { withUAL } from 'ual-reactjs-renderer';
 import { GetServerSideProps } from 'next';
+import { checkUnlockKeyOwnership } from "@utils/checkUnlockKeyOwnership";
 
 import {
   getCollectionService,
@@ -31,14 +32,16 @@ import {
   TemplateProps,
 } from '@services/collection/collectionTemplatesService';
 
+import { getTableRowStorefront } from '@services/account/getTableRowStorefront';
+
 import { CollectionTemplatesList } from '@components/collection/CollectionTemplatesList';
 import { CollectionAccountsList } from '@components/collection/CollectionAccountsList';
+import { CollectionPlugins } from '@components/collection/CollectionPlugins';
 import { CollectionSchemasList } from '@components/collection/CollectionSchemasList';
 import { CollectionAssetsList } from '@components/collection/CollectionAssetsList';
-import { CollectionPlugins } from '@components/collection/CollectionPlugins';
+import { CollectionAssetsSalesList } from '@components/collection/CollectionAssetsSalesList';
 import { CollectionStats } from '@components/collection/CollectionStats';
 import { CollectionHints } from '@components/collection/CollectionHints';
-
 import { isAuthorizedAccount } from '@utils/isAuthorizedAccount';
 import { collectionTabs } from '@utils/collectionTabs';
 import { Header } from '@components/Header';
@@ -54,6 +57,8 @@ interface CollectionPageProps {
   burnedAssets: AssetProps[];
   schemas: SchemaProps[];
   accounts: AccountProps[];
+  collectionName: string;
+  storefrontInfo: any;
 }
 
 function Collection({
@@ -66,6 +71,7 @@ function Collection({
   burnedAssets,
   schemas,
   accounts,
+  storefrontInfo,
 }: CollectionPageProps) {
   const router = useRouter();
   const selectedTabIndex = collectionTabs.findIndex(
@@ -92,6 +98,59 @@ function Collection({
       { shallow: true }
     );
   }
+
+
+  const socials = collection.data.url && collection.data.url.includes('\n') ? collection.data.url.split('\n').map((line) => {
+    if (line.includes('https:') || line.includes('www.')) {
+      const colonIndex = line.indexOf(':', line.indexOf('https:') > -1 ? 6 : 5);
+      const platform = line.substring(0, colonIndex);
+      let url = line.substring(colonIndex + 1);
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        url = "https://" + url;
+      }
+      return { platform, url };
+    }
+    return null;
+  }).filter((item) => item !== null) : [];
+
+  //console.log(socials);
+
+  const hasSocials =
+    socials &&
+    socials.filter((item) => item.platform == 'website' && item.url !== '').length > 0;
+
+  //console.log(hasSocials);
+
+  const website = hasSocials ? socials.filter((item) => item.platform == "website").map((item) => item.url) : [];
+  if (website[0]) {
+    if (!website[0].startsWith("http://") && !website[0].startsWith("https://")) {
+      website[0] = "https://" + website[0];
+    }
+  }
+  //console.log(website);
+
+
+
+  const [isUnlockOwner, setIsUnlockOwner] = useState(false);
+  async function UnlockKey(owner: string, collection: string) {
+    const isUnlockOwner = await checkUnlockKeyOwnership(owner, collection);
+    setIsUnlockOwner(isUnlockOwner);
+  }
+
+  useEffect(() => {
+    if (chainKey !== 'proton-test') {
+      UnlockKey(`${collection.author}`, `${collection.collection_name}`);
+    }
+  }, [chainKey, collection]);
+
+  let storefront;
+  if (storefrontInfo && storefrontInfo[0]) {
+    storefront = storefrontInfo[0].values.reduce((acc, curr) => {
+      acc[curr.key] = curr.value;
+      return acc;
+    }, {});
+  }
+
 
   return (
     <>
@@ -125,20 +184,27 @@ function Collection({
                 Created by {collection.author}
               </Link>
             )}
-            <a
-              href={collection.data.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn"
-            >
-              Website
-            </a>
+            {chainKey === 'proton' && (
+              <Link
+                href={`/${chainKey}/owner/${collection.author}`}
+                className="btn-yellow"
+              >
+                {collection.author} storefront
+              </Link>
+            )}
+            {website[0] && (
+              <a
+                href={website[0]}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn"
+              >
+                Website
+              </a>
+            )}
           </div>
         </Header.Content>
-        <Header.Banner
-          images={[{ ipfs: collection.img, type: 'image' }]}
-          unique
-        />
+        <Header.Banner imageIpfs={collection.img} />
       </Header.Root>
 
       {hasAuthorization && (
@@ -158,9 +224,8 @@ function Collection({
       >
         <Tab.List
           ref={tabsRef}
-          className={`tab-list sticky top-[5.5rem] z-10 duration-75 ${
-            isAddBackground ? 'bg-neutral-900' : ''
-          }`}
+          className={`tab-list sticky top-[5.5rem] z-20 duration-75 ${isAddBackground ? 'bg-neutral-900' : ''
+            }`}
         >
           <Tab className="tab">{collectionTabs[0].name}</Tab>
           <Tab className="tab">
@@ -175,14 +240,15 @@ function Collection({
             {collectionTabs[3].name}
             <span className="badge-small">{stats.assets ?? '0'}</span>
           </Tab>
-          <Tab className="tab">{collectionTabs[4].name}</Tab>
-          {hasAuthorization && (
-            <Tab className="tab">{collectionTabs[5].name}</Tab>
-          )}
+          <Tab className="tab">
+            {collectionTabs[4].name}
+          </Tab>
+          <Tab className="tab">{collectionTabs[5].name}</Tab>
+
         </Tab.List>
         <Tab.Panels>
           <Tab.Panel>
-            <CollectionStats stats={stats} collection={collection} />
+            <CollectionStats stats={stats} collection={collection} socials={socials} />
           </Tab.Panel>
           <Tab.Panel>
             <CollectionSchemasList
@@ -214,6 +280,15 @@ function Collection({
             />
           </Tab.Panel>
           <Tab.Panel>
+            <CollectionAssetsSalesList
+              ual={ual}
+              chainKey={chainKey}
+              collectionName={collection.collection_name}
+              collection={collection}
+              storefront={(storefront) ? storefront : []}
+            />
+          </Tab.Panel>
+          <Tab.Panel>
             <CollectionAccountsList
               chainKey={chainKey}
               initialAccounts={accounts}
@@ -237,22 +312,29 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   const collectionName = context.params.collectionName as string;
 
   try {
+    const { data: collection } = await getCollectionService(chainKey, { collectionName });
+
+    const ownerName = collectionName === "125554242425" ? "income.xpr" : collection.data.author;
+    //const ownerName = "income.xpr";  
+
+    console.log('usersinfo collection:', collection.data);
+
     const [
-      { data: collection },
       { data: stats },
       { data: templates },
       { data: assets },
       { data: burnedAssets },
       { data: schemas },
       { data: accounts },
+      { rows: storefrontInfo },  // Use ownerName here
     ] = await Promise.all([
-      getCollectionService(chainKey, { collectionName }),
       collectionStatsService(chainKey, { collectionName }),
       collectionTemplatesService(chainKey, { collectionName }),
       collectionAssetsService(chainKey, { collectionName, burned: false }),
       collectionAssetsService(chainKey, { collectionName, burned: true }),
       collectionSchemasService(chainKey, { collectionName }),
       collectionAccountsService(chainKey, { collectionName }),
+      getTableRowStorefront(chainKey, { accountName: ownerName }), // call this API after you have the owner's name
     ]);
 
     return {
@@ -265,6 +347,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         burnedAssets: burnedAssets.data,
         schemas: schemas.data,
         accounts: accounts.data,
+        storefrontInfo,
       },
     };
   } catch (error) {
@@ -273,5 +356,6 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     };
   }
 };
+
 
 export default withUAL(Collection);

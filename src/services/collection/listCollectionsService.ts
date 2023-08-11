@@ -1,14 +1,14 @@
 import { api } from '@libs/api';
-import * as chainsConfig from '@configs/chainsConfig';
+import chainsConfig from '@configs/chainsConfig';
 import { AxiosResponse } from 'axios';
 
 interface OptionsProps {
   page?: number;
   offset?: number;
   author?: string;
+  authorized_account?: string;
   match?: string;
   limit?: number;
-  authorizedAccount?: string;
 }
 
 export interface CollectionProps {
@@ -26,8 +26,6 @@ export interface CollectionProps {
     url: string;
     name: string;
     images: string;
-    socials: string;
-    creator_info: string;
   };
   created_at_time: string;
   created_at_block: string;
@@ -43,13 +41,13 @@ export const listCollectionsService = async (
 ): Promise<AxiosResponse<DataProps>> => {
   const url = `${chainsConfig[chainKey].aaEndpoint}/atomicassets/v1/collections`;
 
-  const { page = 1, offset = 0, author, match, authorizedAccount } = options;
+  const { page = 1, offset = 0, author, authorized_account, match } = options;
 
   const response = await api.get(url, {
     params: {
       author,
+      authorized_account,
       match,
-      authorized_account: authorizedAccount,
       page,
       limit: 12,
       offset,

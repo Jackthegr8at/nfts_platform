@@ -20,7 +20,6 @@ import { Modal } from '@components/Modal';
 import { Header } from '@components/Header';
 import { Select } from '@components/Select';
 
-import { countriesList } from '@utils/countriesList';
 
 import { appName } from '@configs/globalsConfig';
 
@@ -28,12 +27,16 @@ const schema = yup.object().shape({
   image: yup.mixed().test('image', 'Image is required', (value) => {
     return value.length > 0;
   }),
-  collectionName: yup.string().matches(/^[a-z1-5.]+$/, {
-    message: 'Only lowercase letters (a-z) and numbers 1-5 are allowed.',
-    excludeEmptyString: false,
-  }),
+  collectionName: yup
+    .string()
+    .matches(/^[a-z1-5.]+$/, {
+      message: 'Only lowercase letters (a-z) and numbers 1-5 are allowed.',
+      excludeEmptyString: false,
+    })
+    .eosName('Must be 12 characters (a-z, 1-5) with no spaces.'),
+  /*.length(12, 'Must have exactly 12 characters.'),*/
   displayName: yup.string().required().label('Display name'),
-  website: yup.string().required().url().label('Website'),
+  /* website: yup.string().required().url().label('Website'),*/
   marketFee: yup
     .number()
     .typeError('Must be between 0% and 15%. Only numbers.')
@@ -50,7 +53,6 @@ function CreateNewCollection({ ual }) {
   const [previewImageSrc, setPreviewImageSrc] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  const [collectionNameError, setCollectionNameError] = useState('');
   const [modal, setModal] = useState({
     title: '',
     message: '',
@@ -69,7 +71,6 @@ function CreateNewCollection({ ual }) {
   });
 
   const image = watch('image');
-  const collectionName = watch('collectionName');
 
   useEffect(() => {
     if (image && image.length > 0) {
@@ -93,40 +94,6 @@ function CreateNewCollection({ ual }) {
     return () => clearTimeout(timer);
   }, [isSaved]);
 
-  useEffect(() => {
-    if (collectionName && ual.activeUser.accountName) {
-      if (!isValidCollectionName(collectionName, ual.activeUser?.accountName)) {
-        setCollectionNameError(
-          'Must be up to 12 characters (a-z, 1-5) with no spaces.'
-        );
-        setIsLoading(false);
-        return;
-      } else {
-        setCollectionNameError('');
-      }
-    }
-  }, [collectionName, ual]);
-
-  function isValidCollectionName(collectionName, userAccount) {
-    if (collectionName.length > 12) {
-      return false;
-    }
-
-    console.log(collectionName.startsWith(`.`));
-
-    if (
-      (collectionName.length <= 12 &&
-        (collectionName === userAccount ||
-          (collectionName.endsWith(`.${userAccount}`) &&
-            !collectionName.startsWith('.')))) ||
-      (collectionName.length === 12 && !collectionName.includes('.'))
-    ) {
-      return true;
-    }
-
-    return false;
-  }
-
   async function onSubmit({
     image,
     collectionName,
@@ -134,30 +101,40 @@ function CreateNewCollection({ ual }) {
     website,
     marketFee,
     description,
+    telegram,
     twitter,
-    medium,
-    facebook,
-    github,
+    instagram,
     discord,
     youtube,
-    telegram,
-    company,
-    registrationNumber,
-    name,
-    address,
-    city,
-    zipCode,
-    country,
+    linkedIn,
+    tikTok,
+    snipcoins,
+    medium,
   }) {
     setIsLoading(true);
 
     try {
-      const data = await uploadImageToIpfsService(image[0]);
+      const socialLinks = [
+        { name: 'website', link: website },
+        { name: 'twitter', link: twitter },
+        { name: 'telegram', link: telegram },
+        { name: 'instagram', link: instagram },
+        { name: 'youtube', link: youtube },
+        { name: 'discord', link: discord },
+        { name: 'linkedIn', link: linkedIn },
+        { name: 'tikTok', link: tikTok },
+        { name: 'snipcoins', link: snipcoins },
+        { name: 'medium', link: medium },
+      ];
 
-      if (collectionNameError) {
-        setIsLoading(false);
-        return;
-      }
+      const socials = socialLinks
+        .map((link) => {
+          const trimmedLink = link.link ? link.link.trim().replace(/\/+$/, '') : '';
+          return `${link.name}:${trimmedLink}`;
+        })
+        .join('\n');
+
+      const data = await uploadImageToIpfsService(image[0]);
 
       await createCollectionService({
         activeUser: ual.activeUser,
@@ -169,51 +146,22 @@ function CreateNewCollection({ ual }) {
         marketFee: marketFee / 100.0,
         data: [
           {
-            key: 'name',
-            value: ['string', displayName],
-          },
-          {
             key: 'description',
             value: ['string', description],
           },
           {
-            key: 'url',
-            value: ['string', website],
+            key: 'name',
+            value: ['string', displayName],
           },
           {
             key: 'img',
             value: ['string', data['IpfsHash']],
           },
           {
-            key: 'socials',
-            value: [
-              'string',
-              JSON.stringify({
-                twitter,
-                medium,
-                facebook,
-                github,
-                discord,
-                youtube,
-                telegram,
-              }),
-            ],
+            key: 'url',
+            value: ['string', `${socials}\n`],
           },
-          {
-            key: 'creator_info',
-            value: [
-              'string',
-              JSON.stringify({
-                company,
-                registration_number: registrationNumber,
-                name,
-                address,
-                city,
-                zipCode,
-                country,
-              }),
-            ],
-          },
+
         ],
       });
       setIsSaved(true);
@@ -315,9 +263,8 @@ function CreateNewCollection({ ual }) {
         >
           <div className="col-span-4 md:col-span-3 lg:col-span-5">
             <label
-              className={`block aspect-square bg-neutral-800 rounded-xl cursor-pointer p-md border ${
-                errors.image?.message ? 'border-red-600' : 'border-neutral-700'
-              }`}
+              className={`block aspect-square bg-neutral-800 rounded-xl cursor-pointer p-md border ${errors.image?.message ? 'border-red-600' : 'border-neutral-700'
+                }`}
             >
               {previewImageSrc ? (
                 <div className="w-full h-full relative">
@@ -330,9 +277,8 @@ function CreateNewCollection({ ual }) {
                 </div>
               ) : (
                 <div
-                  className={`w-full h-full flex flex-col justify-center items-center gap-2 ${
-                    errors.image?.message ? 'text-red-600' : 'text-center'
-                  }`}
+                  className={`w-full h-full flex flex-col justify-center items-center gap-2 ${errors.image?.message ? 'text-red-600' : 'text-center'
+                    }`}
                 >
                   <UploadSimple size={56} weight="bold" />
                   <p className="title-1">Add Collection Image</p>
@@ -353,9 +299,9 @@ function CreateNewCollection({ ual }) {
           <div className="col-span-4 md:col-span-3 lg:col-start-7 lg:col-span-6 flex flex-col gap-8">
             <Input
               {...register('collectionName')}
-              error={errors.collectionName?.message || collectionNameError}
+              error={errors.collectionName?.message}
               label="Collection name"
-              hint="Must be up to 12 characters (a-z, 1-5) with no spaces."
+              hint="Must be 12 characters (a-z, 1-5) with no spaces."
               type="text"
               maxLength={12}
             />
@@ -397,216 +343,167 @@ function CreateNewCollection({ ual }) {
               error={errors.description?.message}
               label="Description"
             />
-            <div className="flex flex-col gap-4 my-4">
-              <Disclosure>
-                {({ open }) => (
-                  <>
-                    <Disclosure.Button className="flex flex-row justify-between items-center py-4 border-y border-neutral-700">
-                      <div className="flex flex-row gap-2 items-baseline">
-                        <span className="title-1">Social Media</span>
-                        <span className="body-1">(optional)</span>
-                      </div>
-                      <CaretDown
-                        size={32}
-                        className={`${
-                          open ? 'rotate-180 transform' : ''
-                        } h-5 w-5`}
-                      />
-                    </Disclosure.Button>
-                    <Disclosure.Panel className="flex flex-col gap-8">
-                      <Controller
-                        control={control}
-                        name="twitter"
-                        defaultValue=""
-                        render={({ field }) => (
-                          <Input
-                            label="Twitter"
-                            value={field.value}
-                            onChange={(event) => {
-                              const value = handlePrependHttps(event);
-                              field.onChange(value);
-                            }}
-                            type="text"
-                            placeholder="https://twitter.com/@handle"
-                          />
-                        )}
-                      />
-                      <Controller
-                        control={control}
-                        name="medium"
-                        defaultValue=""
-                        render={({ field }) => (
-                          <Input
-                            label="medium"
-                            value={field.value}
-                            onChange={(event) => {
-                              const value = handlePrependHttps(event);
-                              field.onChange(value);
-                            }}
-                            type="text"
-                            placeholder="https://medium.com/@username"
-                          />
-                        )}
-                      />
-                      <Controller
-                        control={control}
-                        name="facebook"
-                        defaultValue=""
-                        render={({ field }) => (
-                          <Input
-                            label="Facebook"
-                            value={field.value}
-                            onChange={(event) => {
-                              const value = handlePrependHttps(event);
-                              field.onChange(value);
-                            }}
-                            type="text"
-                            placeholder="https://facebook.com/pageurl"
-                          />
-                        )}
-                      />
-                      <Controller
-                        control={control}
-                        name="github"
-                        defaultValue=""
-                        render={({ field }) => (
-                          <Input
-                            label="GitHub"
-                            value={field.value}
-                            onChange={(event) => {
-                              const value = handlePrependHttps(event);
-                              field.onChange(value);
-                            }}
-                            type="text"
-                            placeholder="https://github.com/username"
-                          />
-                        )}
-                      />
-                      <Controller
-                        control={control}
-                        name="discord"
-                        defaultValue=""
-                        render={({ field }) => (
-                          <Input
-                            label="Discord"
-                            value={field.value}
-                            onChange={(event) => {
-                              const value = handlePrependHttps(event);
-                              field.onChange(value);
-                            }}
-                            type="text"
-                            placeholder="https://discord.gg/invite/channel"
-                          />
-                        )}
-                      />
-                      <Controller
-                        control={control}
-                        name="youtube"
-                        defaultValue=""
-                        render={({ field }) => (
-                          <Input
-                            label="Youtube"
-                            value={field.value}
-                            onChange={(event) => {
-                              const value = handlePrependHttps(event);
-                              field.onChange(value);
-                            }}
-                            type="text"
-                            placeholder="https://youtube.com/channel/channelurl"
-                          />
-                        )}
-                      />
-                      <Controller
-                        control={control}
-                        name="telegram"
-                        defaultValue=""
-                        render={({ field }) => (
-                          <Input
-                            label="Telegram"
-                            value={field.value}
-                            onChange={(event) => {
-                              const value = handlePrependHttps(event);
-                              field.onChange(value);
-                            }}
-                            type="text"
-                            placeholder="https://t.me/username"
-                          />
-                        )}
-                      />
-                    </Disclosure.Panel>
-                  </>
+
+            <div className="flex flex-col gap-8 mt-4">
+              <div className="flex flex-row gap-2 items-baseline">
+                <span className="title-1">Social Media</span>
+                <span className="body-1">(optional)</span>
+              </div>
+              <Controller
+                control={control}
+                name="twitter"
+                defaultValue=""
+                render={({ field }) => (
+                  <Input
+                    label="Twitter"
+                    value={field.value}
+                    onChange={(event) => {
+                      const value = handlePrependHttps(event);
+                      field.onChange(value);
+                    }}
+                    type="text"
+                    placeholder="https://twitter.com/@handle"
+                  />
                 )}
-              </Disclosure>
-              <Disclosure>
-                {({ open }) => (
-                  <>
-                    <Disclosure.Button className="flex flex-row justify-between items-center pb-4 border-b border-neutral-700">
-                      <div className="flex flex-row gap-2 items-baseline">
-                        <span className="title-1">Company Details</span>
-                        <span className="body-1">(optional)</span>
-                      </div>
-                      <CaretDown
-                        size={32}
-                        className={`${
-                          open ? 'rotate-180 transform' : ''
-                        } h-5 w-5`}
-                      />
-                    </Disclosure.Button>
-                    <Disclosure.Panel className="flex flex-col gap-8">
-                      <Input
-                        {...register('company')}
-                        label="Company"
-                        type="text"
-                        placeholder="e.g: Facings"
-                      />
-                      <Input
-                        {...register('registrationNumber')}
-                        label="Registration number"
-                        type="number"
-                        placeholder="e.g: 123456"
-                      />
-                      <Input
-                        {...register('name')}
-                        label="Name of Owner / Managing Director"
-                        type="text"
-                        placeholder="e.g: John Doe"
-                      />
-                      <Controller
-                        control={control}
-                        name="country"
-                        render={({ field }) => (
-                          <Select
-                            label="Country"
-                            onChange={field.onChange}
-                            selectedValue={field.value}
-                            options={countriesList}
-                            placeholder="Select a country"
-                          />
-                        )}
-                      />
-                      <Input
-                        {...register('address')}
-                        label="Address"
-                        type="text"
-                        placeholder="e.g: Gluthstrasse 8"
-                      />
-                      <Input
-                        {...register('city')}
-                        label="City"
-                        type="text"
-                        placeholder="e.g: Munich"
-                      />
-                      <Input
-                        {...register('zipCode')}
-                        label="Zip code / Postal Code"
-                        type="number"
-                        placeholder="e.g: 80803"
-                      />
-                    </Disclosure.Panel>
-                  </>
+              />
+              <Controller
+                control={control}
+                name="telegram"
+                defaultValue=""
+                render={({ field }) => (
+                  <Input
+                    label="Telegram"
+                    value={field.value}
+                    onChange={(event) => {
+                      const value = handlePrependHttps(event);
+                      field.onChange(value);
+                    }}
+                    type="text"
+                    placeholder="https://t.me/username"
+                  />
                 )}
-              </Disclosure>
+              />
+              <Controller
+                control={control}
+                name="instagram"
+                defaultValue=""
+                render={({ field }) => (
+                  <Input
+                    label="Instagram"
+                    value={field.value}
+                    onChange={(event) => {
+                      const value = handlePrependHttps(event);
+                      field.onChange(value);
+                    }}
+                    type="text"
+                    placeholder="https://www.instagram.com/username"
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="youtube"
+                defaultValue=""
+                render={({ field }) => (
+                  <Input
+                    label="Youtube"
+                    value={field.value}
+                    onChange={(event) => {
+                      const value = handlePrependHttps(event);
+                      field.onChange(value);
+                    }}
+                    type="text"
+                    placeholder="https://youtube.com/channel/channelurl"
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="discord"
+                defaultValue=""
+                render={({ field }) => (
+                  <Input
+                    label="Discord"
+                    value={field.value}
+                    onChange={(event) => {
+                      const value = handlePrependHttps(event);
+                      field.onChange(value);
+                    }}
+                    type="text"
+                    placeholder="https://discord.gg/invite/channel"
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="linkedIn"
+                defaultValue=""
+                render={({ field }) => (
+                  <Input
+                    label="LinkedIn"
+                    value={field.value}
+                    onChange={(event) => {
+                      const value = handlePrependHttps(event);
+                      field.onChange(value);
+                    }}
+                    type="text"
+                    placeholder="https://www.linkedin.com/in/username"
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="tikTok"
+                defaultValue=""
+                render={({ field }) => (
+                  <Input
+                    label="tikTok"
+                    value={field.value}
+                    onChange={(event) => {
+                      const value = handlePrependHttps(event);
+                      field.onChange(value);
+                    }}
+                    type="text"
+                    placeholder="https://tikTok.com/@username"
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="snipcoins"
+                defaultValue=""
+                render={({ field }) => (
+                  <Input
+                    label="Snipcoins"
+                    value={field.value}
+                    onChange={(event) => {
+                      const value = handlePrependHttps(event);
+                      field.onChange(value);
+                    }}
+                    type="text"
+                    placeholder="https://snipcoins.com/username"
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="medium"
+                defaultValue=""
+                render={({ field }) => (
+                  <Input
+                    label="Medium"
+                    value={field.value}
+                    onChange={(event) => {
+                      const value = handlePrependHttps(event);
+                      field.onChange(value);
+                    }}
+                    type="text"
+                    placeholder="https://medium.com/@username"
+                  />
+                )}
+              />
             </div>
+
             {isLoading ? (
               <span className="flex gap-2 items-center p-4 body-2 font-bold text-white">
                 <CircleNotch size={24} weight="bold" className="animate-spin" />
@@ -615,9 +512,8 @@ function CreateNewCollection({ ual }) {
             ) : (
               <button
                 type="submit"
-                className={`btn w-fit whitespace-nowrap ${
-                  isSaved && 'animate-pulse bg-emerald-600'
-                }`}
+                className={`btn w-fit whitespace-nowrap ${isSaved && 'animate-pulse bg-emerald-600'
+                  }`}
               >
                 {isSaved ? 'Saved' : 'Create Collection'}
               </button>

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Head from 'next/head';
 import { GetServerSideProps } from 'next';
 
-import { ipfsEndpoint, appName } from '@configs/globalsConfig';
+import { ipfsEndpoint, ipfsGateway, chainKeyDefault, appName } from '@configs/globalsConfig';
 
 import { Card } from '@components/Card';
 import { Header } from '@components/Header';
@@ -80,7 +80,7 @@ function Schema({
           {hasAuthorization && (
             <Link
               href={`/${chainKey}/collection/${collection.collection_name}/schema/${schema.schema_name}/edit`}
-              className="btn w-fit"
+              className="btn mt-4"
             >
               Update Schema
             </Link>
@@ -109,7 +109,7 @@ function Schema({
                 <Card
                   href={`/${chainKey}/collection/${collection.collection_name}`}
                   image={
-                    collection.img ? `${ipfsEndpoint}/${collection.img}` : ''
+                    collection.img ? `${ipfsGateway}/${collection.img}` : ''
                   }
                   title={collection.name}
                   subtitle={`by ${collection.author}`}

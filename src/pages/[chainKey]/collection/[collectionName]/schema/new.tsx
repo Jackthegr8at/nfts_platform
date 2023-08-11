@@ -97,7 +97,7 @@ function NewSchema({ ual, collection, chainKey }: NewSchemaProps) {
     defaultValues: {
       schemaName: '',
       attributes: [
-        { name: 'img', type: 'image' },
+        { name: 'image', type: 'string' },
         { name: 'video', type: 'string' },
       ],
     },
@@ -106,7 +106,7 @@ function NewSchema({ ual, collection, chainKey }: NewSchemaProps) {
   async function onSubmit({ schemaName, attributes }: FormaDataProps) {
     const hasImageOrVideoAttribute = attributes.some(
       (attribute) =>
-        (attribute.name === 'img' && attribute.type === 'image') ||
+        (attribute.name === 'image' && attribute.type === 'string') ||
         (attribute.name === 'video' && attribute.type === 'string')
     );
 
@@ -131,7 +131,7 @@ function NewSchema({ ual, collection, chainKey }: NewSchemaProps) {
 
       modalRef.current?.openModal();
       const title = 'Schema was successfully created';
-      const message = 'Please wait while we redirect you.';
+      const message = 'Please await while we redirect you.';
 
       setModal({
         title,
@@ -193,11 +193,10 @@ function NewSchema({ ual, collection, chainKey }: NewSchemaProps) {
         <Header.Content title="New Schema" />
       </Header.Root>
 
-      <Modal ref={attributeModalRef} title="Add img or video attribute">
+      <Modal ref={attributeModalRef} title="Add image or video attribute">
         <p className="body-2 mt-2">
-          Your schema must contain at least one <strong>img</strong> attribute
-          with type <strong>Image</strong> or one <strong>video</strong>{' '}
-          attribute with type <strong>Text</strong>.
+          Your schema must contain at least one <strong>image</strong> or{' '}
+          <strong>video</strong> attribute.
         </p>
       </Modal>
 
@@ -249,9 +248,8 @@ function NewSchema({ ual, collection, chainKey }: NewSchemaProps) {
                 ) : (
                   <button
                     type="submit"
-                    className={`btn ${
-                      isSaved ? 'animate-pulse bg-emerald-600' : ''
-                    }`}
+                    className={`btn ${isSaved ? 'animate-pulse bg-emerald-600' : ''
+                      }`}
                   >
                     {isSaved ? 'Saved' : 'Create schema'}
                   </button>

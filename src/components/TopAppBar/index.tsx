@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+
+import { useIsApp } from '@hooks/useIsApp';
 
 import { Chain } from './components/Chain';
 import { NavItem } from './components/NavItem';
@@ -13,6 +15,24 @@ export function TopAppBar() {
   const chainKey = router.query.chainKey ?? chainKeyDefault;
 
   const [open, setOpen] = useState(false);
+
+  const { isApp, loading } = useIsApp();
+
+  // If it's app view, expose setOpen function to window object
+  useEffect(() => {
+    if (isApp) {
+      window.openMenu = () => setOpen(true);
+    }
+
+    // Cleanup when component unmounts
+    return () => {
+      window.openMenu = null;
+    };
+  }, [isApp]);
+
+  if (loading) {
+    return null;
+  }
 
   return (
     <header className="flex items-center justify-between top-0 left-0 sticky z-40 w-full py-4 bg-neutral-900 px-4 md:px-8">
@@ -32,17 +52,13 @@ export function TopAppBar() {
             Explorer
           </NavItem>
           <NavItem
-            href={`/${chainKey}/transfer`}
+            href={`/${chainKey}/tools`}
             onClick={() => setOpen(false)}
           >
-            Transfer
+            Tools
           </NavItem>
-          <NavItem
-            href="https://github.com/FACINGS/collection-manager/tree/main/docs/user-guide.md"
-            onClick={() => setOpen(false)}
-            target="_blank"
-          >
-            Docs
+          <NavItem href={`/${chainKey}/unlock`} onClick={() => setOpen(false)}>
+            Unlock
           </NavItem>
           <NavItem href={`/${chainKey}/about`} onClick={() => setOpen(false)}>
             About
@@ -55,7 +71,7 @@ export function TopAppBar() {
           onClick={() => setOpen(!open)}
           aria-label="Menu"
         >
-          {open ? <X size={32} /> : <List size={32} />}
+          {open ? <X size={32} /> : !isApp ? <List size={32} /> : null}
         </button>
       </nav>
     </header>

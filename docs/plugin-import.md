@@ -72,14 +72,13 @@ Note: ❌ indicates cells which are to be left blank.
 2. In the `sysflag` column, enter `datatype`.
 3. For each of your original columns, enter the desired datatype in this row (ignore `max_supply`, `burnable`, and `transferable`).
 
-Example data types:
+Allowed data types:
 1. `string`: any text content
-2. `uint8`: whole numbers from `0` to `255`
-3. `int16`: whole numbers from `-32,768` to `32,767`
-4. `float`: decimal numbers
-5. `image`: IPFS image hash or URL
-6. `ipfs`: IPFS file hash or URL
-7. `bool`: boolean values: `TRUE` or `FALSE`
+2. `uint64`: whole numbers
+3. `double`: decimal numbers
+4. `image`: IPFS image hash or URL
+5. `ipfs`: IPFS file hash or URL
+6. `bool`: boolean values: `TRUE` or `FALSE`
 
 For a full list of allowed types, see [Data Types](data-types.md).
 
@@ -88,13 +87,13 @@ For a full list of allowed types, see [Data Types](data-types.md).
 
 Note: ❌ indicates cells which are to be left blank.
 
-| name       | img                                                         | points    | description         | max_supply | burnable | transferable | sysflag      |
-|------------|-------------------------------------------------------------|-----------|---------------------|:----------:|:--------:|:------------:|:------------:|
-| **string** | **image**                                                   | **uint8** | **string**          | ❌         | ❌       | ❌           | **datatype** |
-| Apple      | QmY2yFqDmSPWiFbzsMeREHXyCkY5LdY62WWyYUhe5ogpmT              | 5         | Crunchy round fruit | 100        | TRUE     | TRUE         |        ❌    |
-| Banana     | bafkreidullbimqjiob2apauxv3tj23kupb5em3c4i5soks2svsbqrvasce | 2         | Mushy yellow fruit  | 100        | TRUE     | TRUE         |        ❌    |
-| Kiwi       | bafkreichwf6uollkwe55bmrvnt3744rnmn5g3boekoh62krgu2umv4qpgu | 3         | Hairy green fruit   | 100        | TRUE     | TRUE         |        ❌    |
-| Cherry     | QmeciM9AtHdCycNAwtWh6bAsLCaKnWjgFAg95pFuP63AGW              | 8         | Red stone fruit     | 100        | TRUE     | TRUE         |        ❌    |
+| name       | img                                                         | points     | description         | max_supply | burnable | transferable | sysflag      |
+|------------|-------------------------------------------------------------|------------|---------------------|:----------:|:--------:|:------------:|:------------:|
+| **string** | **image**                                                   | **uint64** | **string**          | ❌         | ❌       | ❌           | **datatype** |
+| Apple      | QmY2yFqDmSPWiFbzsMeREHXyCkY5LdY62WWyYUhe5ogpmT              | 5          | Crunchy round fruit | 100        | TRUE     | TRUE         |        ❌    |
+| Banana     | bafkreidullbimqjiob2apauxv3tj23kupb5em3c4i5soks2svsbqrvasce | 2          | Mushy yellow fruit  | 100        | TRUE     | TRUE         |        ❌    |
+| Kiwi       | bafkreichwf6uollkwe55bmrvnt3744rnmn5g3boekoh62krgu2umv4qpgu | 3          | Hairy green fruit   | 100        | TRUE     | TRUE         |        ❌    |
+| Cherry     | QmeciM9AtHdCycNAwtWh6bAsLCaKnWjgFAg95pFuP63AGW              | 8          | Red stone fruit     | 100        | TRUE     | TRUE         |        ❌    |
 
 
 ## Step 4: (Optional) Additional properties and validators
@@ -135,7 +134,7 @@ Note: ❌ indicates cells which are to be left blank.
 
 | name     | img                                                         | points    | description         | max_supply | burnable | transferable | sysflag      |
 |----------|-------------------------------------------------------------|-----------|---------------------|:----------:|:--------:|:------------:|:------------:|
-| string   | image                                                       | uint8     | string              | ❌         | ❌       | ❌           | datatype     |
+| string   | image                                                       | uint64    | string              | ❌         | ❌       | ❌           | datatype     |
 | **TRUE** | **TRUE**                                                    | **TRUE**  | **TRUE**            | ❌         | ❌       | ❌           | **required** |
 | **TRUE** | **TRUE**                                                    | **FALSE** | **TRUE**            | ❌         | ❌       | ❌           | **unique**   |
 | Apple    | QmY2yFqDmSPWiFbzsMeREHXyCkY5LdY62WWyYUhe5ogpmT              | 5         | Crunchy round fruit | 100        | TRUE     | TRUE         | ❌           |
@@ -151,11 +150,11 @@ create a schema named `fruits`.
 
 ##### Example
 
-Exported to **[fruits.csv](plugin-import-sample/fruits.csv)**:
+Exported to **[fruits.csv](plugin-import-sample/fruit.csv)**:
 
 ```
 name,img,points,description,max_supply,burnable,transferable,sysflag
-string,image,uint8,string,,,,datatype
+string,image,uint64,string,,,,datatype
 TRUE,TRUE,TRUE,TRUE,,,,required
 TRUE,TRUE,FALSE,TRUE,,,,unique
 Apple,QmY2yFqDmSPWiFbzsMeREHXyCkY5LdY62WWyYUhe5ogpmT,5,Crunchy round fruit,100,TRUE,TRUE,
@@ -170,7 +169,7 @@ This CSV file can now be uploaded in the UI.
 
 1. In the app, navigate to your collection and click the "Add-ons" tab.
 2. Click "Import" to bring up the data import form.
-3. Click "Select File" and use the CSV file you saved in the last step.
+3. Select the CSV file you saved in the last step and click "Upload".
 
 If there are any data or validation errors, the app will let you know which line numbers triggered the errors and what needs to be done to fix them.
 

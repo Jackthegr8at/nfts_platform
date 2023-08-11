@@ -1,5 +1,5 @@
 import * as isIPFS from 'is-ipfs';
-import { ipfsEndpoint } from '@configs/globalsConfig';
+import { ipfsEndpoint, ipfsGateway } from '@configs/globalsConfig';
 import { ReactNode } from 'react';
 
 interface AttributesListProps {

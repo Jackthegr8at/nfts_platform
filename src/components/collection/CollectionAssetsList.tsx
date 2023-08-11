@@ -1,17 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
-import { ipfsEndpoint } from '@configs/globalsConfig';
+import { ipfsEndpoint, ipfsGateway } from '@configs/globalsConfig';
 import {
   collectionAssetsService,
   AssetProps,
 } from '@services/collection/collectionAssetsService';
 
+import { fetchSalesInventory } from '@services/inventory/salesInventoryService';
 import { Card } from '@components/Card';
 import { CardContainer } from '@components/CardContainer';
 import { SeeMoreButton } from '@components/SeeMoreButton';
 import { CreateNewItem } from '@components/collection/CreateNewItem';
 
 import { collectionTabs } from '@utils/collectionTabs';
+
 
 interface CollectionAssetsListProps {
   chainKey: string;
@@ -22,6 +24,7 @@ interface CollectionAssetsListProps {
   collectionName: string;
   hasAuthorization: boolean;
 }
+
 
 export function CollectionAssetsList({
   chainKey,
@@ -35,6 +38,7 @@ export function CollectionAssetsList({
   const [assets, setAssets] = useState(initialAssets);
   const [isLoading, setIsLoading] = useState(false);
   const [burnedAssets, setBurnedAssets] = useState(initialBurnedAssets);
+  const [assetsOnSale, setAssetsOnSale] = useState([]);
 
   const limit = 12;
   const currentPage = Math.ceil(assets.length / limit);
@@ -82,6 +86,15 @@ export function CollectionAssetsList({
     setIsLoading(false);
   }
 
+  useEffect(() => {
+    fetchSalesInventory({ chainKey: chainKey, collectionName: collectionName })
+      .then((data) => {
+        //console.log('Assets fetched:', data);
+        setAssetsOnSale(data);
+      })
+      .catch(err => console.error(err));
+  }, [chainKey, collectionName]);
+
   return (
     <>
       <section className="container">
@@ -99,23 +112,47 @@ export function CollectionAssetsList({
                   label="Create NFT"
                 />
               )}
-              {assets.map((asset) => (
-                <Card
-                  key={asset.asset_id}
-                  id={asset.template && asset.template.template_id}
-                  href={`/${chainKey}/collection/${collectionName}/asset/${asset.asset_id}`}
-                  image={
-                    asset.data.img ? `${ipfsEndpoint}/${asset.data.img}` : ''
-                  }
-                  video={
-                    asset.data.video
-                      ? `${ipfsEndpoint}/${asset.data.video}`
-                      : ''
-                  }
-                  title={asset.name}
-                  subtitle={asset.owner && `Owned by ${asset.owner}`}
-                />
-              ))}
+              {assets.map((asset) => {
+                const saleInfo = assetsOnSale.find(sale => sale.asset_id === asset.asset_id);
+                return (
+                  <div key={asset.asset_id} className="relative bg-neutral-800 rounded-xl cursor-pointer hover:scale-105 duration-300">
+                    {saleInfo && (
+                      <div
+                        className="absolute top-0 right-0 z-10"
+                        title={`On sale for ${saleInfo.listing_price} ${saleInfo.listing_symbol}`}
+                      >
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-800 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-6 w-10 bg-red-800 text-white text-sm items-center justify-center">
+                          Sale
+                        </span>
+                      </div>
+                    )}
+                    <div className="rounded-xl overflow-hidden">
+                      <Card
+                        id={asset.template && asset.template.template_id}
+                        href={`/${chainKey}/collection/${collectionName}/asset/${asset.asset_id}`}
+                        image={
+                          asset.data.img
+                            ? `${ipfsGateway}/${asset.data.img}`
+                            : asset.data.image
+                              ? `${ipfsGateway}/${asset.data.image}`
+                              : asset.data.glbthumb
+                                ? `${ipfsEndpoint}/${asset.data.glbthumb}`
+                                : ''
+                        }
+                        video={
+                          asset.data.video
+                            ? `${ipfsEndpoint}/${asset.data.video}`
+                            : ''
+                        }
+                        title={asset.name}
+                        subtitle={asset.owner && `Owned by ${asset.owner}`}
+                        subtitle2={`${saleInfo ? `${saleInfo.listing_price} ${saleInfo.listing_symbol}` : ''}`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </CardContainer>
 
             {!isEndOfList && (
@@ -159,7 +196,13 @@ export function CollectionAssetsList({
                   id={asset.template && asset.template.template_id}
                   href={`/${chainKey}/collection/${collectionName}/asset/${asset.asset_id}`}
                   image={
-                    asset.data.img ? `${ipfsEndpoint}/${asset.data.img}` : ''
+                    asset.data.img
+                      ? `${ipfsGateway}/${asset.data.img}`
+                      : asset.data.image
+                        ? `${ipfsGateway}/${asset.data.image}`
+                        : asset.data.glbthumb
+                          ? `${ipfsEndpoint}/${asset.data.glbthumb}`
+                          : ''
                   }
                   video={
                     asset.data.video

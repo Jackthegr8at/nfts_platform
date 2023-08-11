@@ -17,22 +17,18 @@ export default function About() {
           <section className="mt-8 md:mt-12 lg:mt-16">
             <h2 className="headline-2 mb-2">Purpose</h2>
             <p className="body-1 text-neutral-200 mb-2">
-              Collection Manager is a reference UI implementation showcasing
-              AtomicAssets functionality, built by FACINGS and funded by the EOS
-              Network Foundation.
-            </p>
-            <p className="body-1 text-neutral-200">
-              It's meant to work as both a stand-alone tool for collection
-              owners, as well as a starting point for NFT developers making
-              their own apps on Antelope. Collection Manager can be forked and
-              customized to suit the needs of your own project.
+              This Collection Manager is based on the project created
+              by the FACINGS team. Protonnz has modified their original
+              work to make it compatible with the Proton blockchain.
+              We than added our own new features and tools that we
+              developed over the past year.
             </p>
 
-            <h3 className="title-1 mt-4 md:mt-8 mb-1">Source Code</h3>
+            <h3 className="title-1 mt-4 md:mt-8 mb-1">Source Code Forked</h3>
             <p className="body-1 text-neutral-200">
               Github:{' '}
               <a
-                href="https://linktr.ee/FACINGSOfficial"
+                href="https://github.com/FACINGS/collection-manager"
                 target="_blank"
                 rel="noreferrer"
                 className="underline"
@@ -41,38 +37,54 @@ export default function About() {
               </a>
             </p>
 
-            <h3 className="title-1 mt-4 md:mt-8 mb-1">Design principles</h3>
-            <ol className="list-decimal pl-6 body-1 text-neutral-200">
-              <li className="pl-1">
-                Keep the core simple and secure with minimal dependencies
-              </li>
-              <li className="pl-1">
-                Help publishers, developers, and businesses ship faster
-              </li>
-              <li className="pl-1">
-                Grow open-source community around core EOS/AtomicAssets needs
-              </li>
-            </ol>
+            <h3 className="title-1 mt-4 md:mt-8 mb-1">ProtonNZ modifications</h3>
+            <p className="body-1 text-neutral-200">
+              Github:{' '}
+              <a
+                href="https://github.com/protonnz/collection-manager"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                https://github.com/protonnz/collection-manager
+              </a>
+            </p>
 
             <h3 className="title-1 mt-4 md:mt-8 mb-1">Core features</h3>
             <ol className="list-decimal pl-6 body-1 text-neutral-200">
               <li className="pl-1">Login and view resource usage</li>
               <li className="pl-1">
-                View/explore collections (schemas, templates, and NFTs)
+                View/explore collections (schemas, templates, and assets)
               </li>
               <li className="pl-1">Create and edit collections</li>
+              <li className="pl-1">Create and edit schemas and template</li>
+              <li className="pl-1">Mass Burn/Mass Sales/Mass Auction/Mass cancel</li>
+              <li className="pl-1">Dashview and abstrakts tools. WIP</li>
+              <li className="pl-1">User Storefront</li>
+              <li className="pl-1">Buy NFTs</li>
+              <li className="pl-1">Claim balance</li>
             </ol>
           </section>
 
           <section className="my-8 md:my-12 lg:my-16">
-            <h2 className="headline-2 mb-2">About AtomicAssets</h2>
+            <h2 className="headline-2 mb-2">About ABSTRAKTS</h2>
+            <p className="body-1 text-neutral-200 mb-2">
+              Abstrakts is an imaginative and playful mixture of AI and freehand
+              art. Using AI to create texture and inspire composition, we are
+              able to develop our characters quicker, while maintaining a human
+              feel, and 100% ORIGINAL artwork. Check out our THREE amazing
+              collections; Abstrakts, Cyber Punks and Synthwave Assassins!
+            </p>
             <p className="body-1 text-neutral-200">
-              AtomicAssets is a Non-Fungible Token (NFT) standard for Antelope
-              blockchains. AtomicAsset NFTs are resource-efficient yet
-              full-featured. All metadata is stored on-chain, and templates are
-              used to efficiently store redundant data. Additional features
-              include native trade offer functionality and on-chain
-              notifications.
+              Social links:{' '}
+              <a
+                href="https://linktr.ee/abstrakts"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                https://linktr.ee/abstrakts
+              </a>
             </p>
           </section>
 

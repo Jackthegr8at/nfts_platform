@@ -19,8 +19,10 @@ import { CardContainer } from '@components/CardContainer';
 import { SeeMoreButton } from '@components/SeeMoreButton';
 import { Header } from '@components/Header';
 
-import * as chainsConfig from '@configs/chainsConfig';
-import { ipfsEndpoint, chainKeyDefault, appName } from '@configs/globalsConfig';
+
+
+import chainsConfig from '@configs/chainsConfig';
+import { ipfsEndpoint, ipfsGateway, chainKeyDefault, appName } from '@configs/globalsConfig';
 
 import { transferAssetService } from '@services/asset/transferAssetService';
 import {
@@ -128,7 +130,7 @@ function Transfer({ ual }) {
 
     ownedCollections.forEach((item) =>
       options.push({
-        label: item.collection.collection_name,
+        label: `(${item.collection.name}) By ${item.collection.author}`,
         value: item.collection.collection_name,
       })
     );
@@ -220,7 +222,7 @@ function Transfer({ ual }) {
 
       modalRef.current?.openModal();
       const title = 'NFT was successfully transferred';
-      const message = 'Please wait while we refresh the page.';
+      const message = 'Please await while we refresh the page.';
 
       setModal({
         title,
@@ -306,6 +308,11 @@ function Transfer({ ual }) {
           <h2 className="headline-2 mt-4 md:mt-8">
             Send your NFTs to another user
           </h2>
+          <ol className="list-decimal pl-6 body-1 text-neutral-200 mt-2">
+            <li className="pl-1">Select the NFTs by clicking on their pictures to the right.</li>
+            <li className="pl-1">Enter the recipient's account name in the "Recipient account" input field.</li>
+            <li className="pl-1">Click the "Transfer NFT" button.</li>
+          </ol>
           <Modal ref={modalRef} title={modal.title}>
             <p className="body-2 mt-2">{modal.message}</p>
             {!modal.isError ? (
@@ -337,7 +344,7 @@ function Transfer({ ual }) {
                 error={errors.recipient?.message}
                 type="text"
                 label="Recipient account"
-                maxLength={12}
+                maxLength={13}
               />
               <Input
                 {...register('memo')}
@@ -348,15 +355,16 @@ function Transfer({ ual }) {
               {selectedAssets.length > 0 ? (
                 <div className="flex flex-col gap-8">
                   <h3 className="headline-3">Selected NFTs</h3>
-                  <CardContainer style="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-2 xl:grid-cols-3 sm:gap-8">
+                  <CardContainer additionalStyle="sm:grid-cols-3 md:grid-cols-2 xl:grid-cols-3">
                     {selectedAssets.map((asset, index) => (
                       <div key={index} className="w-full flex flex-col gap-4">
                         <Card
                           id={asset.template_mint}
                           onClick={() => handleAssetSelection(asset)}
                           image={
-                            asset.data['img']
-                              ? `${ipfsEndpoint}/${asset.data['img']}`
+                            asset.data['image'] || asset.data['glbthumb']
+                              ? `${ipfsGateway}/${asset.data['image'] || asset.data['glbthumb']
+                              }`
                               : ''
                           }
                           video={
@@ -366,8 +374,14 @@ function Transfer({ ual }) {
                           }
                           title={asset.name}
                           subtitle={`by ${asset.collection.author}`}
-                          viewLink={`/${chainKey}/collection/${asset.collection.collection_name}/asset/${asset.asset_id}`}
                         />
+                        <Link
+                          href={`/${chainKey}/collection/${asset.collection.collection_name}/asset/${asset.asset_id}`}
+                          className="btn btn-small whitespace-nowrap w-full text-center truncate"
+                          target="_blank"
+                        >
+                          View Asset
+                        </Link>
                       </div>
                     ))}
                   </CardContainer>
@@ -389,9 +403,8 @@ function Transfer({ ual }) {
               ) : (
                 <button
                   type="submit"
-                  className={`btn w-fit whitespace-nowrap ${
-                    isSaved && 'animate-pulse bg-emerald-600'
-                  }`}
+                  className={`btn w-fit whitespace-nowrap ${isSaved && 'animate-pulse bg-emerald-600'
+                    }`}
                   disabled={selectedAssets.length === 0}
                 >
                   {isSaved ? 'Saved' : 'Transfer NFT'}
@@ -421,7 +434,7 @@ function Transfer({ ual }) {
                   value={match}
                 />
                 {filteredAssets.length > 0 ? (
-                  <CardContainer style="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-2 xl:grid-cols-3 sm:gap-8">
+                  <CardContainer additionalStyle="sm:grid-cols-3 md:grid-cols-2 xl:grid-cols-3">
                     {filteredAssets.map((asset, index) => {
                       if (asset.is_transferable) {
                         return (
@@ -430,29 +443,35 @@ function Transfer({ ual }) {
                             className="w-full flex flex-col gap-4"
                           >
                             <div
-                              className={`cursor-pointer ${
-                                selectedAssets.includes(asset) &&
+                              className={`cursor-pointer ${selectedAssets.includes(asset) &&
                                 'border-4 rounded-xl'
-                              }`}
+                                }`}
                             >
                               <Card
                                 id={asset.template_mint}
                                 onClick={() => handleAssetSelection(asset)}
                                 image={
-                                  asset.data.img
-                                    ? `${ipfsEndpoint}/${asset.data.img}`
+                                  asset.data.image || asset.data.glbthumb
+                                    ? `${ipfsGateway}/${asset.data.image || asset.data.glbthumb
+                                    }`
                                     : ''
                                 }
                                 video={
                                   asset.data.video
-                                    ? `${ipfsEndpoint}/${asset.data.video}`
+                                    ? `${ipfsGateway}/${asset.data.video}`
                                     : ''
                                 }
                                 title={asset.name}
                                 subtitle={`by ${asset.collection.author}`}
-                                viewLink={`/${chainKey}/collection/${asset.collection.collection_name}/asset/${asset.asset_id}`}
                               />
                             </div>
+                            <Link
+                              href={`/${chainKey}/collection/${asset.collection.collection_name}/asset/${asset.asset_id}`}
+                              className="btn btn-small whitespace-nowrap w-full text-center truncate"
+                              target="_blank"
+                            >
+                              View Asset
+                            </Link>
                           </div>
                         );
                       }
@@ -493,7 +512,7 @@ function Transfer({ ual }) {
 
       {!ual?.activeUser && (
         <div className="mx-auto my-14 text-center">
-          <h2 className="headline-2">Connect your wallet</h2>
+          ``<h2 className="headline-2">Connect your wallet</h2>
           <p className="body-1 mt-2 mb-6">
             You need to connect your wallet to transfer a NFT
           </p>

@@ -114,7 +114,7 @@ function EditSchema({
 
       modalRef.current?.openModal();
       const title = 'Schema was successfully updated';
-      const message = 'Please wait while we redirect you.';
+      const message = 'Please await while we redirect you.';
 
       setModal({
         title,
@@ -215,9 +215,8 @@ function EditSchema({
                 ) : (
                   <button
                     type="submit"
-                    className={`btn ${
-                      isSaved && 'animate-pulse bg-emerald-600'
-                    }`}
+                    className={`btn ${isSaved && 'animate-pulse bg-emerald-600'
+                      }`}
                   >
                     {isSaved ? 'Saved' : 'Update schema'}
                   </button>

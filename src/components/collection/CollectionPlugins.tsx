@@ -41,7 +41,7 @@ export function CollectionPlugins({
   return (
     <section className="container">
       <div className="flex flex-col py-8 gap-12">
-        <h2 className="headline-2">{collectionTabs[5].name}</h2>
+        <h2 className="headline-2">{collectionTabs[7].name}</h2>
       </div>
       {(pluginsList.length > 0 || externalPluginsList.length > 0) && (
         <div className="flex-1">

@@ -11,7 +11,7 @@ import { useSwipeable } from 'react-swipeable';
 import { Dialog, Transition } from '@headlessui/react';
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 
-import { ipfsEndpoint } from '@configs/globalsConfig';
+import { ipfsEndpoint, ipfsGateway } from '@configs/globalsConfig';
 import { ImageSkeleton } from '@components/skeletons/ImageSkeleton';
 
 interface CarouselPreviewProps {
@@ -183,9 +183,8 @@ function CarouselPreviewComponent(
                                 key={key}
                                 type="button"
                                 onClick={() => handleSelectedImage(key)}
-                                className={`relative rounded-md inline-block w-full shrink-0 h-full transform-gpu overflow-hidden ${
-                                  key === index && 'border border-white'
-                                }`}
+                                className={`relative rounded-md inline-block w-full shrink-0 h-full transform-gpu overflow-hidden ${key === index && 'border border-white'
+                                  }`}
                               >
                                 {item.type === 'image' ? (
                                   <Image

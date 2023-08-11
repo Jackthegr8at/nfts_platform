@@ -6,20 +6,23 @@ export default function PageNotFound() {
     <>
       <Head>
         <meta name="robots" content="noindex" />
-        <title>Page Not Found</title>
+        <title>Error - Please Try Again</title>
       </Head>
 
-      <div className="grid justify-items-center content-center h-[calc(100vh-15rem)]">
-        <div className="col-start-1 col-end-2 row-start-1 row-end-2">
+      <div className="flex flex-col justify-center items-center h-[calc(100vh-15rem)]">
+        <div>
           <h1 className="font-bold text-7xl uppercase text-center text-neutral-800">
-            Page Not Found
+            Oops! Something Went Wrong
           </h1>
         </div>
-        <div className="col-start-1 col-end-2 row-start-1 row-end-2 text-center">
-          <FlyingSaucer size={128} className="-mt-[4.5rem]" />
+        <div className="flex flex-col justify-center items-center">
+          <FlyingSaucer size={128} />
           <span className="headline-2 block font-bold skew-y-12 tracking-widest">
-            404
+            Error
           </span>
+          <p className="mt-4 text-2xl text-white">
+            Please try reloading the page.
+          </p>
         </div>
       </div>
     </>

@@ -10,6 +10,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { getAssetService, AssetProps } from '@services/asset/getAssetService';
 import { burnAssetService } from '@services/asset/burnAssetService';
 import { updateMutableDataService } from '@services/asset/updateMutableDataService';
+import { uploadImageToIpfsService } from '@services/collection/uploadImageToIpfsService';
 import {
   getCollectionService,
   CollectionProps,
@@ -22,12 +23,9 @@ import { Modal } from '@components/Modal';
 import { Switch } from '@components/Switch';
 import { Header } from '@components/Header';
 import { InputPreview } from '@components/InputPreview';
+import { usePermission } from '@hooks/usePermission';
 
 import { appName } from '@configs/globalsConfig';
-import { usePermission } from '@hooks/usePermission';
-import { handlePreview } from '@utils/handlePreview';
-import { handleAttributesData } from '@utils/handleAttributesData';
-
 interface ModalProps {
   title: string;
   message?: string;
@@ -40,6 +38,11 @@ interface EditAssetProps {
   collection: CollectionProps;
   asset: AssetProps;
   chainKey: string;
+}
+
+interface MutableDataProps {
+  key: string;
+  value: any[];
 }
 
 interface AttributesProps {
@@ -56,19 +59,14 @@ function EditAsset({ ual, collection, asset, chainKey }: EditAssetProps) {
     collectionAuthorizedAccounts: collection.authorized_accounts,
   });
 
-  const [images, setImages] = useState([]);
-  const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [modal, setModal] = useState<ModalProps>({
     title: '',
     message: '',
     details: '',
     isError: false,
   });
-
-  useEffect(() => {
-    handlePreview(asset, setImages);
-  }, [asset]);
 
   const {
     register,
@@ -83,6 +81,9 @@ function EditAsset({ ual, collection, asset, chainKey }: EditAssetProps) {
     (attribute) => asset.template.immutable_data[attribute.name] === undefined
   );
 
+  const assetImage: string = asset.data.image;
+  const assetVideo: string = asset.data.video;
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsSaved(false);
@@ -96,10 +97,61 @@ function EditAsset({ ual, collection, asset, chainKey }: EditAssetProps) {
     const attributes: AttributesProps[] = data;
 
     try {
-      const mutableData = await handleAttributesData({
-        attributes: attributes,
-        dataList: mutableDataList,
-      });
+      const mutableData: MutableDataProps[] = [];
+
+      for (const key in attributes) {
+        const attribute = attributes[key];
+
+        const item = mutableDataList.find((item) => item.name === key);
+
+        if (item && attribute) {
+          if (item.type === 'image' && attribute.length > 0 ||
+            (item.type === 'string' && item.name === 'image' && attribute.length > 0) ||
+            (item.type === 'string' && item.name === 'video' && attribute.length > 0)) {
+            const pinataImage = await uploadImageToIpfsService(attribute[0]);
+
+            mutableData.push({
+              key: key,
+              value: ['string', pinataImage ? pinataImage['IpfsHash'] : ''],
+            });
+          }
+
+          if (item.type === 'bool') {
+            mutableData.push({
+              key: key,
+              value: ['uint8', attribute ? 1 : 0],
+            });
+          }
+
+          if (item.type === 'ipfs') {
+            mutableData.push({
+              key: key,
+              value: ['string', attribute],
+            });
+          }
+
+          if (item.type === 'double') {
+            mutableData.push({
+              key: key,
+              value: ['float64', attribute],
+            });
+          }
+
+          if (item.type === 'uint64') {
+            mutableData.push({
+              key: key,
+              value: [item.type, attribute],
+            });
+          }
+
+          if (item.type === 'string' && item.name !== 'image' && item.name !== 'video') {
+            mutableData.push({
+              key: key,
+              value: [item.type, attribute],
+            });
+          }
+        }
+      }
 
       await updateMutableDataService({
         activeUser: ual.activeUser,
@@ -113,7 +165,7 @@ function EditAsset({ ual, collection, asset, chainKey }: EditAssetProps) {
 
       modalRef.current?.openModal();
       const title = 'NFT was successfully updated';
-      const message = 'Please wait while we redirect you.';
+      const message = 'Please await while we redirect you.';
 
       setModal({
         title,
@@ -164,7 +216,7 @@ function EditAsset({ ual, collection, asset, chainKey }: EditAssetProps) {
       const details = JSON.stringify(e, undefined, 2);
       const message =
         jsonError?.cause?.json?.error?.details[0]?.message ??
-        'Unable to burn NFT';
+        'Unable to burn asset';
 
       setModal({
         title: 'Error',
@@ -182,7 +234,7 @@ function EditAsset({ ual, collection, asset, chainKey }: EditAssetProps) {
   return (
     <>
       <Head>
-        <title>{`Update NFT #${asset.asset_id} - ${appName}`}</title>
+        <title>{`Update Asset #${asset.asset_id} - ${appName}`}</title>
       </Head>
 
       <Header.Root
@@ -204,7 +256,7 @@ function EditAsset({ ual, collection, asset, chainKey }: EditAssetProps) {
         ]}
       >
         <Header.Content title={asset.name} />
-        <Header.Banner images={images} />
+        <Header.Banner imageIpfs={assetImage} videoIpfs={assetVideo} />
       </Header.Root>
 
       <Modal ref={modalRef} title={modal.title}>
@@ -231,7 +283,7 @@ function EditAsset({ ual, collection, asset, chainKey }: EditAssetProps) {
       <Tab.Group>
         <Tab.List className="tab-list mb-4 md:mb-8">
           <Tab className="tab">Mutable data</Tab>
-          {asset.is_burnable && <Tab className="tab">Burn NFT</Tab>}
+          {asset.is_burnable && <Tab className="tab">Burn asset</Tab>}
         </Tab.List>
         <Tab.Panels className="container">
           <Tab.Panel>
@@ -245,13 +297,15 @@ function EditAsset({ ual, collection, asset, chainKey }: EditAssetProps) {
                   mutableDataList.map((item, index) => (
                     <div key={index}>
                       {item.type === 'image' ||
-                      item.type === 'bool' ||
-                      item.type === 'ipfs' ? (
+                        (item.type === 'string' && item.name === 'image') ||
+                        (item.type === 'string' && item.name === 'video') ||
+                        item.type === 'bool' ||
+                        item.type === 'ipfs' ? (
                         <>
                           {item.type === 'image' && (
                             <div className="flex md:flex-row flex-col gap-4">
                               <div className="p-4 flex items-center justify-center border border-neutral-700 rounded">
-                                <span className="md:w-56 w-full text-center title-1 whitespace-nowrap">
+                                <span className="md:w-56 w-full text-center body-2 uppercase whitespace-nowrap">
                                   {item.name}
                                 </span>
                               </div>
@@ -263,10 +317,40 @@ function EditAsset({ ual, collection, asset, chainKey }: EditAssetProps) {
                               />
                             </div>
                           )}
+                          {(item.type === 'string' && item.name === 'image') && (
+                            <div className="flex md:flex-row flex-col gap-4">
+                              <div className="p-4 flex items-center justify-center border border-neutral-700 rounded">
+                                <span className="md:w-56 w-full text-center body-2 uppercase whitespace-nowrap">
+                                  {item.name}
+                                </span>
+                              </div>
+                              <InputPreview
+                                {...register(item.name)}
+                                title="Add Image"
+                                accept="image/*"
+                                ipfsHash={asset.mutable_data[item.name]}
+                              />
+                            </div>
+                          )}
+                          {(item.type === 'string' && item.name === 'video') && (
+                            <div className="flex md:flex-row flex-col gap-4">
+                              <div className="p-4 flex items-center justify-center border border-neutral-700 rounded">
+                                <span className="md:w-56 w-full text-center body-2 uppercase whitespace-nowrap">
+                                  {item.name}
+                                </span>
+                              </div>
+                              <InputPreview
+                                {...register(item.name)}
+                                title="Add Video"
+                                accept="video/*"
+                                ipfsHash={asset.mutable_data[item.name]}
+                              />
+                            </div>
+                          )}
                           {item.type === 'ipfs' && (
                             <div className="flex md:flex-row flex-col gap-4">
                               <div className="p-4 flex items-center justify-center border border-neutral-700 rounded">
-                                <span className="md:w-56 w-full text-center title-1 whitespace-nowrap">
+                                <span className="md:w-56 w-full text-center body-2 uppercase whitespace-nowrap">
                                   {item.name}
                                 </span>
                               </div>
@@ -280,7 +364,7 @@ function EditAsset({ ual, collection, asset, chainKey }: EditAssetProps) {
                           {item.type === 'bool' && (
                             <div className="flex md:flex-row flex-col items-center gap-4">
                               <div className="p-4 border flex items-center justify-center border-neutral-700 rounded">
-                                <span className="w-full md:w-56 text-center title-1 whitespace-nowrap">
+                                <span className="w-full md:w-56 text-center body-2 uppercase whitespace-nowrap">
                                   {item.name}
                                 </span>
                               </div>
@@ -304,7 +388,7 @@ function EditAsset({ ual, collection, asset, chainKey }: EditAssetProps) {
                       ) : (
                         <div className="flex md:flex-row flex-col gap-4">
                           <div className="p-4 border flex items-center justify-center border-neutral-700 rounded">
-                            <span className="w-full md:w-56 text-center title-1 whitespace-nowrap">
+                            <span className="w-full md:w-56 text-center body-2 uppercase whitespace-nowrap">
                               {item.name}
                             </span>
                           </div>
@@ -335,9 +419,8 @@ function EditAsset({ ual, collection, asset, chainKey }: EditAssetProps) {
               ) : (
                 <button
                   type="submit"
-                  className={`btn w-fit whitespace-nowrap ${
-                    isSaved && 'animate-pulse bg-emerald-600'
-                  }`}
+                  className={`btn w-fit whitespace-nowrap ${isSaved && 'animate-pulse bg-emerald-600'
+                    }`}
                 >
                   {isSaved ? 'Saved' : 'Update mutable data'}
                 </button>
@@ -348,11 +431,11 @@ function EditAsset({ ual, collection, asset, chainKey }: EditAssetProps) {
             <Tab.Panel>
               <div className="container mx-auto flex flex-col text-center items-center gap-8">
                 <span className="body-1 text-amber-400">
-                  Note: Burning an NFT does not decrement the issued supply of
+                  Note: Burning an asset does not decrement the issued supply of
                   the parent template.
                 </span>
                 <button className="btn w-fit" onClick={onBurnAsset}>
-                  Burn NFT
+                  Burn asset
                 </button>
               </div>
             </Tab.Panel>

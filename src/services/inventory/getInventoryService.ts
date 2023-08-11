@@ -1,5 +1,5 @@
 import { api } from '@libs/api';
-import * as chainsConfig from '@configs/chainsConfig';
+import chainsConfig from '@configs/chainsConfig';
 import { AxiosResponse } from 'axios';
 
 export interface AssetProps {
@@ -74,19 +74,27 @@ export async function getInventoryService(
 ): Promise<AxiosResponse<DataProps>> {
   const url = `${chainsConfig[chainKey].aaEndpoint}/atomicassets/v1/assets`;
 
-  const { page = 1, offset = 0, owner, collection_name } = options;
+  const {
+    page = 1,
+    offset = 0,
+    owner,
+    collection_name,
+    match = '',
+    limit = 12
+  } = options;
 
   const response = await api.get(url, {
     params: {
       owner,
       collection_name,
+      match,
       page,
-      limit: 12,
+      limit,
       offset,
       order: 'desc',
       sort: 'transferred_at_time',
     },
   });
-
+  //console.log('the result of getInventoryService:', response.data);
   return response;
 }

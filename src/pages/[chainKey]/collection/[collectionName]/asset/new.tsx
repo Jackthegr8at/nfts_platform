@@ -1,20 +1,28 @@
 import { useState, useEffect, Fragment, useRef } from 'react';
+import Image from 'next/image';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { withUAL } from 'ual-reactjs-renderer';
 import { Disclosure } from '@headlessui/react';
 import { Listbox, Transition } from '@headlessui/react';
-import { CaretDown, Check, CircleNotch, TrashSimple } from 'phosphor-react';
+import {
+  CaretDown,
+  Check,
+  CircleNotch,
+  ImageSquare,
+  TrashSimple,
+} from 'phosphor-react';
 import { GetServerSideProps } from 'next';
 
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 
-import { appName } from '@configs/globalsConfig';
+import { ipfsEndpoint, ipfsGateway, chainKeyDefault, appName } from '@configs/globalsConfig';
 
 import { collectionTabs } from '@utils/collectionTabs';
 
+import { uploadImageToIpfsService } from '@services/collection/uploadImageToIpfsService';
 import { collectionAssetsService } from '@services/collection/collectionAssetsService';
 import { createAssetService } from '@services/asset/createAssetService';
 import { getAccount } from '@services/account/getAccount';
@@ -35,20 +43,14 @@ import { Input } from '@components/Input';
 import { Modal } from '@components/Modal';
 import { Switch } from '@components/Switch';
 import { Header } from '@components/Header';
-import { Carousel } from '@components/Carousel';
-import { InputPreview } from '@components/InputPreview';
-
 import { usePermission } from '@hooks/usePermission';
-import { handlePreview } from '@utils/handlePreview';
-import { handleAttributesData } from '@utils/handleAttributesData';
 
 interface NewAssetProps {
   ual: any;
   collection: CollectionProps;
   schemas: SchemaProps[];
-  templates?: TemplateProps[];
+  templates: TemplateProps[];
   chainKey: string;
-  collectionName: string;
 }
 
 interface ModalProps {
@@ -66,12 +68,17 @@ interface FormDataProps {
   attributes: { [key: string]: any }[];
 }
 
+interface MutableDataProps {
+  key: string;
+  value: any[];
+}
+
 function NewAsset({
   ual,
   collection,
   schemas,
+  templates,
   chainKey,
-  collectionName,
 }: NewAssetProps) {
   const router = useRouter();
   const modalRef = useRef(null);
@@ -82,10 +89,10 @@ function NewAsset({
     collectionAuthorizedAccounts: collection.authorized_accounts,
   });
 
-  const [images, setImages] = useState([]);
-  const [isSaved, setIsSaved] = useState(false);
+  const [templateImage, setTemplateImage] = useState<string>(null);
+  const [templateVideo, setTemplateVideo] = useState<string>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [templates, setTemplates] = useState([]);
+  const [isSaved, setIsSaved] = useState(false);
   const [selectedSchema, setSelectedSchema] = useState<SchemaProps>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateProps>(null);
   const [modal, setModal] = useState<ModalProps>({
@@ -98,7 +105,7 @@ function NewAsset({
   const remainingSupply =
     selectedTemplate &&
     parseInt(selectedTemplate.max_supply) -
-      parseInt(selectedTemplate.issued_supply);
+    parseInt(selectedTemplate.issued_supply);
 
   const wasFullyMinted =
     parseInt(selectedTemplate?.max_supply, 10) > 0 && remainingSupply === 0;
@@ -134,7 +141,6 @@ function NewAsset({
     register,
     handleSubmit,
     control,
-    setValue,
     formState: { errors },
   } = useForm({
     mode: 'onBlur',
@@ -148,47 +154,16 @@ function NewAsset({
   }, [schemas]);
 
   useEffect(() => {
-    const getAllTemplates = async () => {
-      try {
-        const allData = [];
-        let currentPage = 1;
-
-        while (true) {
-          const response = await collectionTemplatesService(chainKey, {
-            collectionName,
-            schemaName: selectedSchema?.schema_name,
-            page: currentPage,
-            limit: 1000,
-          });
-
-          const responseData = response.data.data;
-
-          if (responseData.length === 0) {
-            break;
-          }
-
-          allData.push(...responseData);
-          currentPage++;
-        }
-
-        setTemplates(allData);
-      } catch (error) {
-        console.log(error);
-      }
-    };
-
-    if (selectedSchema) {
-      getAllTemplates();
-    }
-  }, [selectedSchema, chainKey, collectionName]);
-
-  useEffect(() => {
-    setSelectedTemplate(templates[0]);
-  }, [templates]);
+    const templatesBySchema = templates.filter(
+      (template) => template.schema.schema_name === selectedSchema?.schema_name
+    );
+    setSelectedTemplate(templatesBySchema[0]);
+  }, [selectedSchema, templates]);
 
   useEffect(() => {
     if (selectedTemplate) {
-      handlePreview(selectedTemplate, setImages);
+      setTemplateImage(selectedTemplate.immutable_data?.image);
+      setTemplateVideo(selectedTemplate.immutable_data?.video);
     }
   }, [selectedTemplate]);
 
@@ -208,6 +183,8 @@ function NewAsset({
       selectedTemplate &&
       selectedTemplate.immutable_data[attribute.name] === undefined
   );
+  //console.log(selectedTemplate);
+
 
   const {
     fields: recipientsFields,
@@ -239,20 +216,62 @@ function NewAsset({
   async function onSubmit({ recipients, ...attributes }: FormDataProps) {
     setIsLoading(true);
 
-    // collect non-blank keys
-    const usedKeys = Object.keys(attributes).filter((k) => attributes[k] != '');
-
-    // filter `attributes` to non-blank values
-    const filteredAttributes = usedKeys.reduce((out, k) => {
-      out[k] = attributes[k];
-      return out;
-    }, {});
-
     try {
-      const mutableData = await handleAttributesData({
-        attributes: filteredAttributes,
-        dataList: mutableDataList,
-      });
+      const mutableData: MutableDataProps[] = [];
+
+      for (const key in attributes) {
+        const attribute = attributes[key];
+
+        const item = mutableDataList.find((item) => item.name === key);
+
+        if (item && attribute) {
+          if (item.type === 'image' && attribute.length > 0 ||
+            (item.type === 'string' && item.name === 'image' && attribute.length > 0) ||
+            (item.type === 'string' && item.name === 'video' && attribute.length > 0)) {
+            const pinataImage = await uploadImageToIpfsService(attribute[0]);
+
+            mutableData.push({
+              key: key,
+              value: ['string', pinataImage ? pinataImage['IpfsHash'] : ''],
+            });
+          }
+
+          if (item.type === 'bool') {
+            mutableData.push({
+              key: key,
+              value: ['uint8', attribute ? 1 : 0],
+            });
+          }
+
+          if (item.type === 'ipfs') {
+            mutableData.push({
+              key: key,
+              value: ['string', attribute],
+            });
+          }
+
+          if (item.type === 'double') {
+            mutableData.push({
+              key: key,
+              value: ['float64', attribute],
+            });
+          }
+
+          if (item.type === 'uint64') {
+            mutableData.push({
+              key: key,
+              value: [item.type, attribute],
+            });
+          }
+
+          if (item.type === 'string' && item.name !== 'image' && item.name !== 'video') {
+            mutableData.push({
+              key: key,
+              value: [item.type, attribute],
+            });
+          }
+        }
+      }
 
       const actions = [];
 
@@ -294,7 +313,7 @@ function NewAsset({
 
       modalRef.current?.openModal();
       const title = 'NFT was successfully created';
-      const message = 'Please wait while we redirect you.';
+      const message = 'Please await while we redirect you.';
 
       setModal({
         title,
@@ -332,6 +351,10 @@ function NewAsset({
     setIsLoading(false);
   }
 
+  const templateOptions = templates.filter(
+    (template) => template.schema.schema_name === selectedSchema?.schema_name
+  );
+
   if (PermissionDenied) {
     return <PermissionDenied />;
   }
@@ -339,7 +362,7 @@ function NewAsset({
   return (
     <>
       <Head>
-        <title>{`New NFT - ${appName}`}</title>
+        <title>{`New Asset - ${appName}`}</title>
       </Head>
 
       <Header.Root
@@ -354,10 +377,10 @@ function NewAsset({
             collectionTabs[3].name,
             `/${chainKey}/collection/${collection.collection_name}?tab=${collectionTabs[3].key}`,
           ],
-          ['New NFT'],
+          ['New Asset'],
         ]}
       >
-        <Header.Content title="New NFT" />
+        <Header.Content title="New Asset" />
       </Header.Root>
 
       <div className="container py-8">
@@ -369,7 +392,7 @@ function NewAsset({
             <div className="flex flex-col gap-8">
               <div className="flex flex-col w-full">
                 <h3 className="headline-2 block mb-4">Select schema</h3>
-                {schemas.length > 0 && selectedSchema ? (
+                {schemas.length > 0 ? (
                   <Listbox value={selectedSchema} onChange={setSelectedSchema}>
                     <div className="relative">
                       <Listbox.Button className="relative w-full cursor-default border border-neutral-700 rounded body-1 bg-neutral-800 p-4 text-left shadow-md focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-orange-300">
@@ -395,10 +418,9 @@ function NewAsset({
                             <Listbox.Option
                               key={index}
                               className={({ active }) =>
-                                `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                                  active
-                                    ? 'bg-neutral-700 text-white'
-                                    : 'text-white-900'
+                                `relative cursor-default select-none py-2 pl-10 pr-4 ${active
+                                  ? 'bg-neutral-700 text-white'
+                                  : 'text-white-900'
                                 }`
                               }
                               value={schema}
@@ -406,9 +428,8 @@ function NewAsset({
                               {({ selected }) => (
                                 <>
                                   <span
-                                    className={`block truncate ${
-                                      selected ? 'font-medium' : 'font-normal'
-                                    }`}
+                                    className={`block truncate ${selected ? 'font-medium' : 'font-normal'
+                                      }`}
                                   >
                                     {schema.schema_name}
                                   </span>
@@ -441,7 +462,7 @@ function NewAsset({
               </div>
               <div className="flex flex-col w-full">
                 <h3 className="headline-2 block mb-4">Select template</h3>
-                {templates.length > 0 && selectedTemplate ? (
+                {templateOptions.length > 0 ? (
                   <Listbox
                     value={selectedTemplate}
                     onChange={setSelectedTemplate}
@@ -468,41 +489,36 @@ function NewAsset({
                         leaveTo="opacity-0"
                       >
                         <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-neutral-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none body-3 z-10">
-                          {templates.length > 0 &&
-                            templates.map((template, index) => {
-                              return (
-                                <Listbox.Option
-                                  key={index}
-                                  className={({ active }) =>
-                                    `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                                      active
-                                        ? 'bg-neutral-700 text-white'
-                                        : 'text-white-900'
-                                    }`
-                                  }
-                                  value={template}
-                                >
-                                  {({ selected }) => (
-                                    <>
-                                      <span
-                                        className={`block truncate ${
-                                          selected
-                                            ? 'font-medium'
-                                            : 'font-normal'
+                          {templateOptions.map((template, index) => {
+                            return (
+                              <Listbox.Option
+                                key={index}
+                                className={({ active }) =>
+                                  `relative cursor-default select-none py-2 pl-10 pr-4 ${active
+                                    ? 'bg-neutral-700 text-white'
+                                    : 'text-white-900'
+                                  }`
+                                }
+                                value={template}
+                              >
+                                {({ selected }) => (
+                                  <>
+                                    <span
+                                      className={`block truncate ${selected ? 'font-medium' : 'font-normal'
                                         }`}
-                                      >
-                                        {template.name ?? '- No name -'}
+                                    >
+                                      {template.name ?? '- No name -'}
+                                    </span>
+                                    {selected ? (
+                                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-white">
+                                        <Check size={16} />
                                       </span>
-                                      {selected ? (
-                                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-white">
-                                          <Check size={16} />
-                                        </span>
-                                      ) : null}
-                                    </>
-                                  )}
-                                </Listbox.Option>
-                              );
-                            })}
+                                    ) : null}
+                                  </>
+                                )}
+                              </Listbox.Option>
+                            );
+                          })}
                         </Listbox.Options>
                       </Transition>
                     </div>
@@ -522,39 +538,63 @@ function NewAsset({
                 )}
               </div>
             </div>
-            {selectedTemplate && (
-              <div className="flex1">
-                <Carousel images={images} />
-              </div>
-            )}
+            <div className="w-full aspect-square bg-neutral-700 relative rounded-md overflow-hidden">
+              {templateVideo && (
+                <video
+                  muted
+                  autoPlay
+                  loop
+                  playsInline
+                  className="w-full h-full object-cover"
+                >
+                  <source src={templateVideo} type="video/mp4" />
+                </video>
+              )}
+              {selectedTemplate && templateImage && (
+                <div className="w-full h-full relative">
+                  <Image
+                    alt={selectedTemplate.name}
+                    src={`${ipfsGateway}/${templateImage}`}
+                    fill
+                    priority
+                    sizes="max-w-lg"
+                    className="object-contain"
+                  />
+                </div>
+              )}
+              {!templateVideo && !templateImage && (
+                <div className="w-full h-full flex items-center justify-center text-white">
+                  <ImageSquare size={96} />
+                </div>
+              )}
+            </div>
           </div>
 
           {schemas.length > 0 &&
-          !wasFullyMinted &&
-          selectedTemplate &&
-          selectedTemplate.immutable_data ? (
+            !wasFullyMinted &&
+            selectedTemplate &&
+            selectedTemplate.immutable_data ? (
             <>
               <div className="flex flex-col w-full gap-4">
                 <div className="flex flex-col w-full">
-                  <h3 className="headline-2 block">NFT data</h3>
+                  <h3 className="headline-2 block">Asset data</h3>
                   <p className="body-1 text-neutral-400 mb-4">
-                    Mint to your own account or airdrop the NFT to specific
+                    Mint to your own account or airdrop the asset to specific
                     accounts.
                   </p>
                 </div>
                 <div className="flex flex-col body-2 text-white gap-4">
                   <div className="flex gap-4 font-bold">
-                    <span className="flex-1">NFT Recipient</span>
+                    <span className="flex-1">Asset Recipient</span>
                     <div className="flex-1">
                       <span className="pr-2">Number of Copies</span>
                       <span className="font-normal text-neutral-400">
-                        {`(Between 1-${
-                          parseInt(selectedTemplate?.max_supply, 10) > 0 &&
+                        {`(Between 1-${parseInt(selectedTemplate?.max_supply, 10) > 0 &&
                           remainingSupply &&
                           remainingSupply < 50
-                            ? remainingSupply
-                            : 50
-                        })`}
+                          ? remainingSupply
+                          : 50
+                          })`}
                       </span>
                     </div>
                   </div>
@@ -608,9 +648,9 @@ function NewAsset({
                       <span>
                         {selectedTemplate
                           ? 'Remaining Supply: ' +
-                            (parseInt(selectedTemplate.max_supply, 10) > 0
-                              ? remainingSupply
-                              : 'Unlimited')
+                          (parseInt(selectedTemplate.max_supply, 10) > 0
+                            ? remainingSupply
+                            : 'Unlimited')
                           : ''}
                       </span>
                     </div>
@@ -632,24 +672,20 @@ function NewAsset({
                         return (
                           <div
                             key={index}
-                            className="grid grid-cols-12 gap-4 mt-8 pb-8 lg:pb-0 lg:mt-4 border-b border-neutral-700 lg:border-none"
+                            className="flex md:flex-row flex-col gap-4"
                           >
-                            <div className="col-span-12 sm:col-span-6 lg:col-span-4 xl:col-span-4 p-3 flex items-center justify-center border border-neutral-700 rounded">
-                              <span className="title-1 text-white whitespace-nowrap">
+                            <div className="p-4 border flex items-center justify-center border-neutral-700 rounded">
+                              <span className="w-full md:w-56 text-center body-2 uppercase whitespace-nowrap">
                                 {item.name}
                               </span>
                             </div>
-                            <div className="col-span-12 sm:col-span-6 lg:col-span-8 xl:col-span-8">
-                              <Input
-                                type="text"
-                                placeholder={item.type}
-                                value={
-                                  selectedTemplate.immutable_data[item.name]
-                                }
-                                readOnly
-                                disabled
-                              />
-                            </div>
+                            <Input
+                              type="text"
+                              placeholder={item.type}
+                              value={selectedTemplate.immutable_data[item.name]}
+                              readOnly
+                              disabled
+                            />
                           </div>
                         );
                       }
@@ -669,47 +705,80 @@ function NewAsset({
                     schemaAttributes.format.map((item, index) => {
                       if (mutableDataList.includes(item)) {
                         return (
-                          <div
-                            key={index}
-                            className="grid grid-cols-12 gap-4 mt-8 pb-8 lg:pb-0 lg:mt-4 border-b border-neutral-700 lg:border-none"
-                          >
-                            <div className="col-span-12 sm:col-span-6 lg:col-span-4 xl:col-span-4 p-3 flex items-center justify-center border border-neutral-700 rounded">
-                              <span className="title-1 text-white whitespace-nowrap">
-                                {item.name}
-                              </span>
-                            </div>
-                            <div className="col-span-12 flex sm:col-span-6 lg:col-span-8 xl:col-span-8">
-                              {item.type === 'image' ? (
-                                <InputPreview
-                                  {...register(item.name)}
-                                  setValue={setValue}
-                                  title="Add Image"
-                                  description="Upload or drag and drop an image"
-                                  accept="image/*"
-                                />
-                              ) : item.type === 'video' ? (
-                                <InputPreview
-                                  {...register(item.name)}
-                                  setValue={setValue}
-                                  title="Add Video"
-                                  description="Upload or drag and drop a video"
-                                  accept="video/*"
-                                />
-                              ) : item.type === 'bool' ? (
-                                <Controller
-                                  control={control}
-                                  name={item.name}
-                                  render={({ field }) => (
-                                    <Switch
-                                      onChange={field.onChange}
-                                      checked={field.value}
-                                      label={
-                                        field.value ? 'Enabled' : 'Disabled'
-                                      }
+                          <div key={index}>
+                            {item.type === 'image' || (item.type === 'string' && item.name === 'image') || item.type === 'bool' || (item.type === 'string' && item.name === 'video') ? (
+                              <>
+                                {item.type === 'image' || (item.type === 'string' && item.name === 'image') && (
+                                  <div className="flex md:flex-row flex-col gap-4">
+                                    <div className="p-4 flex items-center justify-center border border-neutral-700 rounded">
+                                      <span className="md:w-56 w-full text-center body-2 uppercase whitespace-nowrap">
+                                        {item.name}
+                                      </span>
+                                    </div>
+                                    <label
+                                      htmlFor="file"
+                                      className="flex w-full p-4 items-start rounded bg-neutral-800 border focus-within:border-white focus-within:bg-neutral-700 border-neutral-700"
+                                    >
+                                      <input
+                                        id="file"
+                                        {...register(item.name)}
+                                        type="file"
+                                        accept="image/*"
+                                      />
+                                    </label>
+                                  </div>
+                                )}
+                                {(item.type === 'string' && item.name === 'video') && (
+                                  <div className="flex md:flex-row flex-col gap-4">
+                                    <div className="p-4 flex items-center justify-center border border-neutral-700 rounded">
+                                      <span className="md:w-56 w-full text-center body-2 uppercase whitespace-nowrap">
+                                        {item.name}
+                                      </span>
+                                    </div>
+                                    <label
+                                      htmlFor="file"
+                                      className="flex w-full p-4 items-start rounded bg-neutral-800 border focus-within:border-white focus-within:bg-neutral-700 border-neutral-700"
+                                    >
+                                      <input
+                                        id="file"
+                                        {...register(item.name)}
+                                        type="file"
+                                        accept="video/*"
+                                      />
+                                    </label>
+                                  </div>
+                                )}
+                                {item.type === 'bool' && (
+                                  <div className="flex md:flex-row flex-col items-center gap-4">
+                                    <div className="p-4 border flex items-center justify-center border-neutral-700 rounded">
+                                      <span className="w-full md:w-56 text-center body-2 uppercase whitespace-nowrap">
+                                        {item.name}
+                                      </span>
+                                    </div>
+
+                                    <Controller
+                                      control={control}
+                                      name={item.name}
+                                      render={({ field }) => (
+                                        <Switch
+                                          onChange={field.onChange}
+                                          checked={field.value}
+                                          label={
+                                            field.value ? 'Enabled' : 'Disabled'
+                                          }
+                                        />
+                                      )}
                                     />
-                                  )}
-                                />
-                              ) : (
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="flex md:flex-row flex-col gap-4">
+                                <div className="p-4 border flex items-center justify-center border-neutral-700 rounded">
+                                  <span className="w-full md:w-56 text-center body-2 uppercase whitespace-nowrap">
+                                    {item.name}
+                                  </span>
+                                </div>
                                 <Input
                                   {...register(item.name)}
                                   error={errors[item.name]?.message}
@@ -718,8 +787,8 @@ function NewAsset({
                                     item.type === 'string' ? 'text' : item.type
                                   }
                                 />
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </div>
                         );
                       }
@@ -755,9 +824,8 @@ function NewAsset({
           ) : (
             <button
               type="submit"
-              className={`btn w-fit whitespace-nowrap ${
-                isSaved && 'animate-pulse bg-emerald-600'
-              }`}
+              className={`btn w-fit whitespace-nowrap ${isSaved && 'animate-pulse bg-emerald-600'
+                }`}
               disabled={
                 !selectedSchema ||
                 !selectedTemplate ||
@@ -765,7 +833,7 @@ function NewAsset({
                 (selectedTemplate && !selectedTemplate.immutable_data)
               }
             >
-              {isSaved ? 'Saved' : 'Create NFT'}
+              {isSaved ? 'Saved' : 'Create asset'}
             </button>
           )}
         </form>
@@ -799,17 +867,19 @@ export const getServerSideProps: GetServerSideProps = async ({ params }) => {
   const chainKey = params.chainKey as string;
   const collectionName = params.collectionName as string;
 
-  const [{ data: collection }, { data: schemas }] = await Promise.all([
-    getCollectionService(chainKey, { collectionName }),
-    collectionSchemasService(chainKey, { collectionName }),
-  ]);
+  const [{ data: collection }, { data: schemas }, { data: templates }] =
+    await Promise.all([
+      getCollectionService(chainKey, { collectionName }),
+      collectionSchemasService(chainKey, { collectionName }),
+      collectionTemplatesService(chainKey, { collectionName }),
+    ]);
 
   return {
     props: {
       chainKey,
       schemas: schemas.data,
+      templates: templates.data,
       collection: collection.data,
-      collectionName,
     },
   };
 };

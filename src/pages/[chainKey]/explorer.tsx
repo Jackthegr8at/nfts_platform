@@ -1,11 +1,11 @@
 import Head from 'next/head';
 import { GetStaticProps, GetStaticPaths } from 'next';
 
-import { CollectionItemsList } from '@components/collection/CollectionItemsList';
+import { CollectionItemsList } from '@components/collection/CollectionItemsList2';
 
 import { listCollectionsService } from '@services/collection/listCollectionsService';
 
-import * as chainsConfig from '@configs/chainsConfig';
+import chainsConfig from '@configs/chainsConfig';
 import { appName } from '@configs/globalsConfig';
 
 import { CollectionProps } from '@services/collection/listCollectionsService';

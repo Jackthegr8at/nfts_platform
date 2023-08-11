@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { ImageSquare } from 'phosphor-react';
 
-import { ipfsEndpoint } from '@configs/globalsConfig';
+import { ipfsEndpoint, ipfsGateway } from '@configs/globalsConfig';
 import { CarouselPreview } from './CarouselPreview';
 import { ImageSkeleton } from '@components/skeletons/ImageSkeleton';
 
@@ -46,9 +46,8 @@ export function Carousel({ images, unique }: CarouselProps) {
       >
         <div
           onClick={() => selectedImage?.ipfs && modalRef.current?.openModal()}
-          className={`relative w-full md:max-w-[14rem] md:min-w-[14rem] lg:max-w-sm lg:min-w-sm mx-auto aspect-square ${
-            selectedImage?.ipfs && 'cursor-zoom-in'
-          }`}
+          className={`relative w-full md:max-w-[14rem] md:min-w-[14rem] lg:max-w-sm lg:min-w-sm mx-auto aspect-square ${selectedImage?.ipfs && 'cursor-zoom-in'
+            }`}
         >
           {selectedImage ? (
             <>
@@ -108,9 +107,8 @@ export function Carousel({ images, unique }: CarouselProps) {
                           key={key}
                           type="button"
                           onClick={() => handleSelectedImage(key)}
-                          className={`relative rounded-md inline-block w-full shrink-0 h-full transform-gpu overflow-hidden ${
-                            key === index && 'border border-white'
-                          }`}
+                          className={`relative rounded-md inline-block w-full shrink-0 h-full transform-gpu overflow-hidden ${key === index && 'border border-white'
+                            }`}
                         >
                           {item.type === 'image' ? (
                             <Image
@@ -120,7 +118,7 @@ export function Carousel({ images, unique }: CarouselProps) {
                               alt="small images on the bottom"
                               sizes="max-w-xs"
                             />
-                          ) : item.type === 'video' ? (
+                          ) : (
                             <video
                               muted
                               autoPlay
@@ -133,10 +131,6 @@ export function Carousel({ images, unique }: CarouselProps) {
                                 type="video/mp4"
                               />
                             </video>
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-neutral-800 text-white rounded-xl">
-                              <ImageSquare size={96} />
-                            </div>
                           )}
                         </motion.button>
                       ))}

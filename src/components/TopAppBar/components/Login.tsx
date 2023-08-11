@@ -7,7 +7,7 @@ import { CaretDown } from 'phosphor-react';
 import { getAccount } from '@services/account/getAccount';
 import { getChainKeyByChainId } from '@utils/getChainKeyByChainId';
 
-import * as chainsConfig from '@configs/chainsConfig';
+import chainsConfig from '@configs/chainsConfig';
 
 interface LoginComponentProps {
   chainKey: string;
@@ -91,6 +91,24 @@ function LoginComponent({ chainKey, ual }: LoginComponentProps) {
               <span>RAM</span>
               <span>{amountAvailableRam}%</span>
             </div>
+            {chainKey === "proton" ? (
+              <>
+                <div>
+                  <a href="https://protonresources.com/storage" target="_blank" rel="noopener noreferrer">
+                    Buy RAM
+                  </a>
+                </div>
+                <div className="mt-4">
+                  <a href={`/${chainKey}/owner/${ual.activeUser.accountName}`} className="text-highlight">
+                    My Storefront
+                  </a>
+                </div>
+              </>
+            ) : (
+              <a href="https://testnet.protonresources.com/storage" target="_blank" rel="noopener noreferrer">
+                Buy RAM
+              </a>
+            )}
           </div>
         </Menu.Item>
         <Menu.Item>

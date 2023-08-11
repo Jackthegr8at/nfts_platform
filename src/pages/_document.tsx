@@ -12,7 +12,7 @@ export default function Document() {
     <Html lang="en">
       <Head>
         <meta charSet="UTF-8" />
-        <meta name="description" content={appDescription} />
+
         <meta property="og:title" content={appName} />
         <meta property="og:site_name" content={appName} />
         <meta property="og:description" content={appDescription} />
@@ -21,6 +21,8 @@ export default function Document() {
         <meta name="twitter:image:alt" content={appDescription} />
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:image" content={metaIcon} />
+        <meta name="description" content={appDescription} />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href={favicon} />
         <link rel="apple-touch-icon" href={metaIcon} />
         <link
