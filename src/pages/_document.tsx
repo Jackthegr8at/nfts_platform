@@ -22,7 +22,6 @@ export default function Document() {
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:image" content={metaIcon} />
         <meta name="description" content={appDescription} />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href={favicon} />
         <link rel="apple-touch-icon" href={metaIcon} />
         <link

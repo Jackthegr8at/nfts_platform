@@ -1,0 +1,9 @@
+.slick-dots li button:before {
+  color: rgb(245, 158, 11) !important;
+  /* Color of the inactive dots - equivalent to Tailwind's text-yellow-500 */
+}
+
+.slick-dots li.slick-active button:before {
+  color: rgb(202, 138, 4) !important;
+  /* Color of the active dot - equivalent to Tailwind's text-yellow-600 */
+}

@@ -30,6 +30,7 @@
     "framer-motion": "^9.0.3",
     "is-ipfs": "^7.0.3",
     "next": "^13.2.3",
+    "papaparse": "^5.4.1",
     "clsx": "^1.2.1",
     "eventsource-parser": "^0.1.0",
     "react-cookie": "^4.1.1",

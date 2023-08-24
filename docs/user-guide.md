@@ -1,5 +1,5 @@
 
-The FACINGS NFT Creator allows you to publish, manage, and distribute AtomicAssets NFTs. This guide assumes you have general knowledge of the EOS ecosystem, an Antelope account (such as EOS, WAX, or Proton) with sufficient resources to publish transactions, and a supported wallet such as *Anchor* or *Cloud Wallet*.
+The FACINGS NFT Creator allows you to publish, manage, and distribute AtomicAssets NFTs. This guide assumes you have general knowledge of the EOS ecosystem, an Antelope account (such as EOS, WAX, or XPR Network) with sufficient resources to publish transactions, and a supported wallet such as *Anchor* or *Cloud Wallet*.
 If you need more help getting started with account setup and familiarity with Antelope blockchains, we recommend starting here: https://academy.anyo.io/
 
 If it's your first time publishing an NFT collection or you are simply testing the app, you should create a free testnet account before following this guide. Currently this app supports both [EOS Jungle4 Testnet](https://eosinabox.com/) and [WAX Testnet](https://waxsweden.org/create-testnet-account/). (Click links to create a free testing account.)

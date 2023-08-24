@@ -19,8 +19,17 @@ export default function About() {
             <p className="body-1 text-neutral-200 mb-2">
               This Collection Manager is based on the project created
               by the FACINGS team. Protonnz has modified their original
-              work to make it compatible with the Proton blockchain.
-              We than added our own new features and tools that we
+              work to make it compatible with the 
+              {' '}
+              <a
+                href="https://xprnetwork.org"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                XPR Network
+              </a>
+              . We than added our own new features and tools that we
               developed over the past year.
             </p>
 

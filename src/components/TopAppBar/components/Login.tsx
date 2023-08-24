@@ -91,7 +91,7 @@ function LoginComponent({ chainKey, ual }: LoginComponentProps) {
               <span>RAM</span>
               <span>{amountAvailableRam}%</span>
             </div>
-            {chainKey === "proton" ? (
+            {chainKey === "xprnetwork" ? (
               <>
                 <div>
                   <a href="https://protonresources.com/storage" target="_blank" rel="noopener noreferrer">

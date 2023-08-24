@@ -1,34 +1,21 @@
-FROM node:16-alpine
+FROM node:18-alpine
 
 # Setting working directory. All the path will be relative to WORKDIR
-WORKDIR /usr/app
-
-# Install PM2 globally
-RUN npm install --global pm2
+WORKDIR /usr/src/app
 
 # Installing dependencies
-COPY ./package*.json ./
-
-# Install dependencies
+COPY package*.json ./
 RUN yarn install
 
-
 # Copying source files
-COPY ./ ./
+COPY . .
+RUN chmod -R 777 /usr/src/app
 
-# Build app
-RUN yarn build
-
-RUN chown -R node .next
+# We are not building the app for a development setup
+# RUN yarn build
 
 # Expose the listening port
 EXPOSE 3000
 
-# The node user is provided in the Node.js Alpine base image
-
-USER node
-
-# Run npm start script with PM2 when container starts
-#CMD [ "pm2-runtime", "start", "yarn" ]
-
-CMD [ "pm2-runtime", "start", "npm", "--", "start" ]
+# This is a production CMD. You'll override this in your docker-compose for development.
+CMD ["yarn", "start"]

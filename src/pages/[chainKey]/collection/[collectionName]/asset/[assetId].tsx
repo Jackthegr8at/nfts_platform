@@ -67,9 +67,13 @@ function Asset({ ual, chainKey, asset }: AssetViewProps) {
 
   const hasAuthorization = isAuthorizedAccount(ual, collection) as boolean;
 
-  const unixTimestamp = Math.floor(Number(asset.minted_at_time) / 1000); // Example Unix timestamp
-  const date = new Date(unixTimestamp * 1000); // Multiply by 1000 to convert back to milliseconds
-  const localMintDateTime = date.toLocaleString(); // Convert to local date time
+  const [localDate, setLocalDate] = useState(null);
+
+  useEffect(() => {
+      const unixTimestamp = Math.floor(Number(asset.minted_at_time) / 1000);
+      const date = new Date(unixTimestamp * 1000);
+      setLocalDate(date.toLocaleString());
+  }, [asset.minted_at_time]);
 
   const [priceInfo, setPriceInfo] = useState(null);
   const assetId = asset.asset_id;
@@ -184,8 +188,8 @@ function Asset({ ual, chainKey, asset }: AssetViewProps) {
           {Object.keys(asset.mutable_data).length > 0 && (
             <Tab className="tab">Mutable data</Tab>
           )}
-          {chainKey !== 'proton-test' && (
-            <Tab className="tab">Proton Market</Tab>
+          {chainKey !== 'xprnetwork-test' && (
+            <Tab className="tab">XPR Market</Tab>
           )}
         </Tab.List>
         <Tab.Panels className="container">
@@ -206,9 +210,12 @@ function Asset({ ual, chainKey, asset }: AssetViewProps) {
                 <div className="w-full md:max-w-sm mx-auto">
                   <div className="flex justify-between py-3 body-2 text-white border-b border-neutral-700">
                     <span>Owner</span>
-                    <Link href={`/${chainKey}/owner/${asset.owner}`}>
-                      <a className="text-highlight">{asset.owner}</a>
-                    </Link>
+                    <div
+                      onClick={() => router.push(`/${chainKey}/owner/${asset.owner}`)}
+                      className="text-highlight cursor-pointer"
+                    >
+                      {asset.owner}
+                    </div>
                   </div>
                   <div className="flex justify-between py-3 body-2 text-white border-b border-neutral-700">
                     <span>Mint Number</span>
@@ -233,7 +240,7 @@ function Asset({ ual, chainKey, asset }: AssetViewProps) {
                       <>
                         <div className="flex justify-between py-3 body-2 text-white border-b border-neutral-700">
                           <span>Minted Date</span>
-                          <span className="font-bold">{localMintDateTime}</span>
+                          <span className="font-bold">{localDate || 'Loading...'}</span>
                         </div>
                         <div className="flex justify-between py-3 body-2 text-white border-b border-neutral-700">
                           <span>Template ID</span>
@@ -302,10 +309,10 @@ function Asset({ ual, chainKey, asset }: AssetViewProps) {
               </Attributes.List>
             </Tab.Panel>
           )}
-          {chainKey !== 'proton-test' && (
+          {chainKey !== 'xprnetwork-test' && (
             <Tab.Panel>
               <div className="flex-1">
-                <h3 className="headline-3 mb-4">Proton Markets</h3>
+                <h3 className="headline-3 mb-4">XPR Markets</h3>
                 {marketasset.map((item, index) => {
                   return (
                     <a

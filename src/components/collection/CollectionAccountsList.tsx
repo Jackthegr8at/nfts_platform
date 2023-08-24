@@ -60,7 +60,7 @@ export function CollectionAccountsList({
             {accounts.map((account) => (
               <Card
                 key={account.account}
-                href={chainKey === "proton" ? `/${chainKey}/owner/${account.account}` : "#"}
+                href={chainKey === "xprnetwork" ? `/${chainKey}/owner/${account.account}` : "#"}
                 image={
                   account.account
                     ? `https://api.dicebear.com/5.x/avataaars-neutral/png?seed=${account.account}`

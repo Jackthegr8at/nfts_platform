@@ -284,7 +284,7 @@ function NewSpecialMint({
 
       modalRef.current?.openModal();
       const title = 'Template was successfully created';
-      const message = 'Please await while we redirect you.';
+      const message = 'Please wait while we redirect you.';
 
       setModal({
         title,

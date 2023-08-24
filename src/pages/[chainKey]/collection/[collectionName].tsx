@@ -5,7 +5,6 @@ import { useRouter } from 'next/router';
 import { Tab } from '@headlessui/react';
 import { withUAL } from 'ual-reactjs-renderer';
 import { GetServerSideProps } from 'next';
-import { checkUnlockKeyOwnership } from "@utils/checkUnlockKeyOwnership";
 
 import {
   getCollectionService,
@@ -130,19 +129,6 @@ function Collection({
   //console.log(website);
 
 
-
-  const [isUnlockOwner, setIsUnlockOwner] = useState(false);
-  async function UnlockKey(owner: string, collection: string) {
-    const isUnlockOwner = await checkUnlockKeyOwnership(owner, collection);
-    setIsUnlockOwner(isUnlockOwner);
-  }
-
-  useEffect(() => {
-    if (chainKey !== 'proton-test') {
-      UnlockKey(`${collection.author}`, `${collection.collection_name}`);
-    }
-  }, [chainKey, collection]);
-
   let storefront;
   if (storefrontInfo && storefrontInfo[0]) {
     storefront = storefrontInfo[0].values.reduce((acc, curr) => {
@@ -184,7 +170,7 @@ function Collection({
                 Created by {collection.author}
               </Link>
             )}
-            {chainKey === 'proton' && (
+            {chainKey === 'xprnetwork' && (
               <Link
                 href={`/${chainKey}/owner/${collection.author}`}
                 className="btn-yellow"
@@ -240,11 +226,8 @@ function Collection({
             {collectionTabs[3].name}
             <span className="badge-small">{stats.assets ?? '0'}</span>
           </Tab>
-          <Tab className="tab">
-            {collectionTabs[4].name}
-          </Tab>
+          <Tab className="tab">{collectionTabs[4].name}</Tab>
           <Tab className="tab">{collectionTabs[5].name}</Tab>
-
         </Tab.List>
         <Tab.Panels>
           <Tab.Panel>
@@ -279,6 +262,7 @@ function Collection({
               hasAuthorization={hasAuthorization}
             />
           </Tab.Panel>
+
           <Tab.Panel>
             <CollectionAssetsSalesList
               ual={ual}
@@ -292,12 +276,6 @@ function Collection({
             <CollectionAccountsList
               chainKey={chainKey}
               initialAccounts={accounts}
-              collectionName={collection.collection_name}
-            />
-          </Tab.Panel>
-          <Tab.Panel>
-            <CollectionPlugins
-              chainKey={chainKey}
               collectionName={collection.collection_name}
             />
           </Tab.Panel>
@@ -317,40 +295,76 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     const ownerName = collectionName === "125554242425" ? "income.xpr" : collection.data.author;
     //const ownerName = "income.xpr";  
 
-    console.log('usersinfo collection:', collection.data);
+    //console.log('usersinfo collection:', collection.data);
 
-    const [
-      { data: stats },
-      { data: templates },
-      { data: assets },
-      { data: burnedAssets },
-      { data: schemas },
-      { data: accounts },
-      { rows: storefrontInfo },  // Use ownerName here
-    ] = await Promise.all([
-      collectionStatsService(chainKey, { collectionName }),
-      collectionTemplatesService(chainKey, { collectionName }),
-      collectionAssetsService(chainKey, { collectionName, burned: false }),
-      collectionAssetsService(chainKey, { collectionName, burned: true }),
-      collectionSchemasService(chainKey, { collectionName }),
-      collectionAccountsService(chainKey, { collectionName }),
-      getTableRowStorefront(chainKey, { accountName: ownerName }), // call this API after you have the owner's name
-    ]);
 
-    return {
-      props: {
-        chainKey,
-        collection: collection.data,
-        stats: stats.data,
-        templates: templates.data,
-        assets: assets.data,
-        burnedAssets: burnedAssets.data,
-        schemas: schemas.data,
-        accounts: accounts.data,
-        storefrontInfo,
-      },
-    };
+    if (chainKey !== 'xprnetwork-test') {
+
+      const [
+        { data: stats },
+        { data: templates },
+        { data: assets },
+        { data: burnedAssets },
+        { data: schemas },
+        { data: accounts },
+        { rows: storefrontInfo },
+      ] = await Promise.all([
+        collectionStatsService(chainKey, { collectionName }),
+        collectionTemplatesService(chainKey, { collectionName }),
+        collectionAssetsService(chainKey, { collectionName, burned: false }),
+        collectionAssetsService(chainKey, { collectionName, burned: true }),
+        collectionSchemasService(chainKey, { collectionName }),
+        collectionAccountsService(chainKey, { collectionName }),
+        getTableRowStorefront(chainKey, { accountName: ownerName }),
+      ]);
+
+      return {
+        props: {
+          chainKey,
+          collection: collection.data,
+          stats: stats.data,
+          templates: templates.data,
+          assets: assets.data,
+          burnedAssets: burnedAssets.data,
+          schemas: schemas.data,
+          accounts: accounts.data,
+          storefrontInfo,
+        },
+      };
+
+    } else {
+
+      const [
+        { data: stats },
+        { data: templates },
+        { data: assets },
+        { data: burnedAssets },
+        { data: schemas },
+        { data: accounts },
+      ] = await Promise.all([
+        collectionStatsService(chainKey, { collectionName }),
+        collectionTemplatesService(chainKey, { collectionName }),
+        collectionAssetsService(chainKey, { collectionName, burned: false }),
+        collectionAssetsService(chainKey, { collectionName, burned: true }),
+        collectionSchemasService(chainKey, { collectionName }),
+        collectionAccountsService(chainKey, { collectionName }),
+      ]);
+
+      return {
+        props: {
+          chainKey,
+          collection: collection.data,
+          stats: stats.data,
+          templates: templates.data,
+          assets: assets.data,
+          burnedAssets: burnedAssets.data,
+          schemas: schemas.data,
+          accounts: accounts.data,
+        },
+      };
+    }
   } catch (error) {
+    console.error("Error fetching data:", error);
     return {
       notFound: true,
     };

@@ -57,9 +57,6 @@ export function TopAppBar() {
           >
             Tools
           </NavItem>
-          <NavItem href={`/${chainKey}/unlock`} onClick={() => setOpen(false)}>
-            Unlock
-          </NavItem>
           <NavItem href={`/${chainKey}/about`} onClick={() => setOpen(false)}>
             About
           </NavItem>

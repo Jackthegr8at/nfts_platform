@@ -2,15 +2,29 @@ import { useState, useRef, useEffect } from 'react';
 import { Disclosure } from '@headlessui/react';
 import { withUAL } from 'ual-reactjs-renderer';
 import { useRouter } from 'next/router';
+import Papa from 'papaparse';
+import { WarningCircle } from 'phosphor-react';
 
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 
-import { pluginInfo } from './config';
+import {
+  pluginInfo,
+  breakArray,
+  clearBatch,
+  batchOptions,
+  validateDataType,
+  checkIfSchemaExists,
+  suggestionDataTypes,
+  continueImportBatchTransactions,
+} from './config';
 import { Review } from './review';
 
 import { Modal } from '@components/Modal';
+import { Select } from '@components/Select';
+
+import { handleAttributesData } from '@utils/handleAttributesData';
 
 const csv = yup.object().shape({
   csvFile: yup.mixed().required(),
@@ -56,25 +70,29 @@ interface SchemaAttributesProps {
   type: string;
 }
 
-interface InvalidTypeProps {
-  property: string;
-  type: string;
+interface ImportErrorsProps {
+  index: number;
+  type?: string;
+  property?: string;
+  title?: string;
+  message: string;
 }
 
-interface RequiredPropertiesProps {
-  property: string;
-  templateIndex: number;
+interface RowsProps {
+  [key: string]: any;
 }
 
-interface UniquePropertiesProps {
-  property: string;
-  data: any[];
+interface TemplateProps {
+  [key: string]: any;
 }
 
-interface InvalidUniqueProperties {
-  property: string;
-  repeated: string;
-  rows: any[];
+interface ValidationProps {
+  [key: string]: any;
+}
+
+interface HintsProps {
+  title: string;
+  message: string;
 }
 
 function Import({ ual }: ImportProps) {
@@ -83,39 +101,35 @@ function Import({ ual }: ImportProps) {
 
   const { chainKey, collectionName } = router.query;
 
+  const [rows, setRows] = useState<RowsProps[]>([]);
   const [fileName, setFileName] = useState<string>('');
+  const [attributes, setAttributes] = useState<String[]>([]);
   const [actions, setActions] = useState<ActionsProps[]>([]);
+  const [templates, setTemplates] = useState<TemplateProps[]>([]);
+  const [importErrors, setImportErrors] = useState<ImportErrorsProps[]>([]);
+  const [dataTypes, setDataTypes] = useState<ValidationProps>({});
+  const [required, setRequired] = useState<ValidationProps>({});
+  const [uniques, setUniques] = useState<ValidationProps>({});
+  const [hints, setHints] = useState<HintsProps[]>([]);
+  const [headersLength, setHeadersLength] = useState(0);
   const [schemaAttributes, setSchemaAttributes] = useState<
     SchemaAttributesProps[]
-  >([]);
-  const [templates, setTemplates] = useState([]);
-  const [invalidType, setInvalidType] = useState<InvalidTypeProps[]>([]);
-  const [requiredProperties, setRequiredProperties] = useState<
-    RequiredPropertiesProps[]
-  >([]);
-  const [uniqueProperties, setUniqueProperties] = useState<
-    UniquePropertiesProps[]
-  >([]);
-  const [invalidUniqueProperties, setInvalidUniqueProperties] = useState<
-    InvalidUniqueProperties[]
   >([]);
   const [modal, setModal] = useState<ModalProps>({
     title: '',
     message: '',
     details: '',
   });
-
-  const attributeTypeOptions = [
-    'string',
-    'uint64',
-    'double',
-    'image',
-    'ipfs',
-    'bool',
-  ];
+  const [transactions, setTransactions] = useState([]);
+  const [transactionBatch, setTransactionBatch] = useState(
+    JSON.parse(localStorage.getItem('transactionBatch')) || []
+  );
+  const [hasRemainingTransactions, setHasRemainingTransactions] =
+    useState(false);
+  const [selectedBatchSizeOption, setSelectedBatchSizeOption] = useState('25');
+  const [existentSchemaInfo, setExistentSchemaInfo] = useState({});
 
   const {
-    reset,
     register,
     handleSubmit,
     formState: { errors },
@@ -124,424 +138,54 @@ function Import({ ual }: ImportProps) {
   });
 
   useEffect(() => {
-    setActions([]);
-    setTemplates([]);
-    setSchemaAttributes([]);
-  }, [fileName]);
+    if (actions.length > 0) {
+      setTransactions(breakArray(actions, selectedBatchSizeOption));
+    }
+  }, [actions, selectedBatchSizeOption]);
 
   useEffect(() => {
-    function resetAllValues() {
-      reset();
-      setActions([]);
-      setFileName('');
-      setTemplates([]);
-      setInvalidType([]);
-      setUniqueProperties([]);
-      setSchemaAttributes([]);
-      setRequiredProperties([]);
-      setInvalidUniqueProperties([]);
+    if (transactions.length > 0 && importErrors.length === 0) {
+      localStorage.setItem('transactionBatch', JSON.stringify(transactions));
     }
-
-    if (
-      fileName &&
-      !fileName.match(/(^[a-z1-5.]{1,11}[a-z1-5]$)|(^[a-z1-5.]{12}[a-j1-5]$)/)
-    ) {
-      modalRef.current?.openModal();
-      const title = 'Invalid File Name';
-      const message =
-        'The file name is used to define the name of the schema and it must be up to 12 characters (a-z, 1-5, .) and cannot end with a "."';
-
-      setModal({
-        title,
-        message,
-      });
-
-      resetAllValues();
-    }
-
-    if (invalidType.length > 0) {
-      modalRef.current?.openModal();
-      const title = 'Invalid Type';
-      const message =
-        'A schema property has an invalid type please check the valid datatypes list.';
-      const details = `${invalidType
-        .map((item) => {
-          const { property, type } = item;
-          return `<p>Property: <b>"${property}"</b> has an invalid datatype <b>"${type}"</b>.</p><br>`;
-        })
-        .toString()
-        .replace(/,/, '')}`;
-
-      setModal({
-        title,
-        message,
-        details,
-      });
-
-      resetAllValues();
-    }
-
-    if (requiredProperties.length > 0) {
-      modalRef.current?.openModal();
-      const title = 'Required Attribute';
-      const message =
-        'A required attribute is empty please check the details for more information.';
-      const details = `${requiredProperties
-        .map((item) => {
-          return `<p>Property <b>"${item.property}"</b> is empty at row <b>"${item.templateIndex + 6
-            }".</p></br>`;
-        })
-        .toString()
-        .replace(/,/g, '')}`;
-
-      setModal({
-        title,
-        message,
-        details,
-      });
-
-      resetAllValues();
-    }
-
-    if (invalidUniqueProperties.length > 0) {
-      modalRef.current?.openModal();
-      const title = 'Unique Attribute';
-      const message =
-        'An attribute that should be unique has been repeated, please check the details for more information.';
-      const details = `${invalidUniqueProperties
-        .map((item) => {
-          return `<p>Property <b>"${item.property}"</b> has the value <b>"${item.repeated
-            }"</b> repeated at rows ${item.rows.map(
-              (row) => `<b>"${row}";</b>`
-            )}.</p></br>`;
-        })
-        .toString()
-        .replace(/,/g, '')}`;
-
-      setModal({
-        title,
-        message,
-        details,
-      });
-
-      resetAllValues();
-    }
-  }, [
-    invalidType,
-    requiredProperties,
-    invalidUniqueProperties,
-    fileName,
-    reset,
-  ]);
+  }, [transactions, importErrors]);
 
   useEffect(() => {
-    if (uniqueProperties.length > 0) {
-      uniqueProperties.map((item) => {
-        const rows = [];
-        const repeatedProperty = item.data.filter(
-          (currentValue, currentIndex) =>
-            item.data.indexOf(currentValue) !== currentIndex
-        )[0];
-
-        if (repeatedProperty) {
-          item.data.map((item, index) => {
-            item === repeatedProperty && rows.push(index);
-          });
-
-          setInvalidUniqueProperties((state) => [
-            ...state,
-            ...[
-              {
-                property: item.property,
-                repeated: repeatedProperty,
-                rows: rows,
-              },
-            ],
-          ]);
-        }
-      });
+    if (transactionBatch.length > 0) {
+      setHasRemainingTransactions(true);
     }
-  }, [uniqueProperties]);
-
-  const handleCSVFile = (string) => {
-    const filteredHeaders = string
-      .slice(0, string.indexOf('\n'))
-      .replace(/(\r)/g, '')
-      .split(',')
-      .filter((header) => header !== '') as string[];
-
-    const sysflagIndex = filteredHeaders.indexOf('sysflag') as number;
-
-    const rows = string
-      .slice(string.indexOf('\n') + 1)
-      .replace(/(\r)/g, '')
-      .split('\n')
-      .slice(0, sysflagIndex) as string[];
-
-    let headersInfo = [];
-    const templatesInfo = [];
-
-    const headers = filteredHeaders.slice(0, sysflagIndex + 1);
-
-    const sysflags = ['datatype', 'unique', 'required', 'mutable'];
-
-    rows.map((item) => {
-      const rowItem = item.split(',');
-
-      const isHeader =
-        rowItem.filter((item) => sysflags.includes(item)).length > 0;
-
-      if (isHeader) {
-        const header = rowItem
-          .filter((item) => item !== '')
-          .slice(0, headers.length - 3);
-
-        const sysflag = header.pop();
-
-        headersInfo = {
-          ...headersInfo,
-          ...{ [sysflag]: header },
-        };
-      } else {
-        const templateRow = rowItem
-          ?.slice(0, headers.length - 1)
-          ?.filter((item) => item !== '');
-
-        if (templateRow?.length) {
-          templatesInfo.push([...templateRow]);
-        }
-      }
-    });
-
-    const excludeHeaders = [
-      'sysflag',
-      'max_supply',
-      'burnable',
-      'transferable',
-    ];
-
-    if (!headers.includes('img' || 'video')) {
-      modalRef.current?.openModal();
-      const title = 'Add img or video attribute';
-      const message =
-        'Your schema must contain at least one img or video attribute.';
-
-      setModal({
-        title,
-        message,
-      });
-
-      reset();
-      return;
-    }
-
-    templatesInfo.map((property, key) => {
-      property.map((item, index) => {
-        const required =
-          headersInfo['required'][index] === 'TRUE' ? true : false;
-
-        if (required && item === '') {
-          setRequiredProperties((state) => [
-            ...state,
-            ...[{ property: headers[index], templateIndex: key }],
-          ]);
-        }
-      });
-    });
-
-    headersInfo['unique'].map((element, index) => {
-      const isUnique = element === 'TRUE' ? true : false;
-      const values = [];
-
-      templatesInfo.map((item) => {
-        values.push(item[index]);
-      });
-
-      if (isUnique) {
-        setUniqueProperties((state) => [
-          ...state,
-          ...[
-            {
-              property: headers[index],
-              data: values,
-            },
-          ],
-        ]);
-      }
-    });
-
-    headersInfo['datatype'].map((type, index) => {
-      if (!attributeTypeOptions.includes(type)) {
-        const invalid = { property: headers[index], type: type };
-        setInvalidType((state) => [...state, ...[invalid]]);
-      }
-    });
-
-    const attributes = [];
-    headers
-      .filter((attribute) => !excludeHeaders.includes(attribute))
-      .map((attribute, index) => {
-        attributes.push({
-          name: attribute,
-          type: headersInfo['datatype'] && headersInfo['datatype'][index],
-        });
-      });
-
-    setSchemaAttributes(attributes);
-
-    templatesInfo.map((template) => {
-      let newTemplate = {};
-      headers
-        .filter((header) => header !== 'sysflag')
-        .map((item, index) => {
-          if (!excludeHeaders.includes(item)) {
-            const { type } = attributes.find(
-              (element) => element.name === item
-            );
-
-            newTemplate = {
-              ...newTemplate,
-              ...{
-                [item]: {
-                  value: template[index],
-                  type: type,
-                  mutable:
-                    headersInfo['mutable'] &&
-                      headersInfo['mutable'][index] === 'TRUE'
-                      ? true
-                      : false,
-                },
-              },
-            };
-          } else {
-            newTemplate = { ...newTemplate, ...{ [item]: template[index] } };
-          }
-        });
-
-      setTemplates((state) => [...state, ...[newTemplate]]);
-    });
-  };
-
-  useEffect(() => {
-    if (
-      fileName &&
-      collectionName &&
-      ual &&
-      templates.length > 0 &&
-      schemaAttributes.length > 0
-    ) {
-      const newActions = [];
-
-      const createSchema = {
-        account: 'atomicassets',
-        name: 'createschema',
-        authorization: [
-          {
-            actor: ual.activeUser.accountName,
-            permission: ual.activeUser.requestPermission,
-          },
-        ],
-        data: {
-          authorized_creator: ual.activeUser.accountName,
-          collection_name: collectionName,
-          schema_name: fileName,
-          schema_format: schemaAttributes,
-        },
-      };
-
-      newActions.push(createSchema);
-
-      templates.map((template) => {
-        const immutableData = [];
-
-        for (const key in template) {
-          if (
-            key !== 'burnable' &&
-            key !== 'max_supply' &&
-            key !== 'transferable' &&
-            !template[key].mutable
-          ) {
-            if (
-              template[key].type === 'image' ||
-              template[key].type === 'ipfs' ||
-              template[key].name === 'video'
-            ) {
-              immutableData.push({
-                key: key,
-                value: ['string', template[key].value],
-              });
-            } else if (template[key].type === 'bool') {
-              immutableData.push({
-                key: key,
-                value: ['uint8', parseInt(template[key].value)],
-              });
-            } else if (template[key].type === 'double') {
-              immutableData.push({
-                key: key,
-                value: ['float64', parseInt(template[key].value)],
-              });
-            } else if (template[key].type === 'uint64') {
-              immutableData.push({
-                key: key,
-                value: ['uint64', parseInt(template[key].value)],
-              });
-            } else {
-              immutableData.push({
-                key: key,
-                value: [template[key].type, template[key].value],
-              });
-            }
-          }
-        }
-
-        const createTemplate = {
-          account: 'atomicassets',
-          name: 'createtempl',
-          authorization: [
-            {
-              actor: ual.activeUser.accountName,
-              permission: ual.activeUser.requestPermission,
-            },
-          ],
-          data: {
-            authorized_creator: ual.activeUser.accountName,
-            collection_name: collectionName,
-            schema_name: fileName,
-            transferable: template.transferable === 'TRUE' ? true : false,
-            burnable: template.burnable === 'TRUE' ? true : false,
-            max_supply: template.max_supply,
-            immutable_data: immutableData,
-          },
-        };
-
-        newActions.push(createTemplate);
-      });
-
-      setActions(newActions);
-    }
-  }, [ual, collectionName, fileName, schemaAttributes, templates]);
+    localStorage.setItem('transactionBatch', JSON.stringify(transactionBatch));
+  }, [transactionBatch]);
 
   async function onSubmit() {
-    if (invalidType.length > 0) {
-      return;
-    }
-
     try {
-      if (actions.length > 0) {
-        await ual.activeUser.signTransaction(
-          { actions },
-          {
-            blocksBehind: 3,
-            expireSeconds: 30,
+      if (transactions.length > 0) {
+        let updatedBatch = [...transactions];
+
+        for (const actions of transactions) {
+          const result = await ual.activeUser.signTransaction(
+            { actions },
+            {
+              blocksBehind: 3,
+              expireSeconds: 60,
+            }
+          );
+
+          if (result.status === 'executed') {
+            updatedBatch = updatedBatch.filter((item) => item !== actions);
+            setTransactionBatch(updatedBatch);
           }
-        );
+        }
+
         modalRef.current?.openModal();
         const title = 'Import was successful';
-        const message = 'Please await while we redirect you.';
+        const message = 'Please wait while we redirect you.';
         setModal({
           title,
           message,
         });
+
+        localStorage.removeItem('transactionBatch');
+
         async function redirect() {
           router.push(`/${chainKey}/collection/${collectionName}`);
         }
@@ -563,22 +207,459 @@ function Import({ ual }: ImportProps) {
     }
   }
 
+  useEffect(() => {
+    if (
+      fileName &&
+      !fileName.match(/(^[a-z1-5.]{1,11}[a-z1-5]$)|(^[a-z1-5.]{12}[a-j1-5]$)/)
+    ) {
+      setImportErrors((state) => [
+        ...state,
+        ...[
+          {
+            index: 0,
+            title: 'Invalid schema',
+            message:
+              'The file name is used to define the name of the schema and it must be up to 12 characters (a-z, 1-5, .) and cannot end with a "."',
+          },
+        ],
+      ]);
+    }
+  }, [fileName]);
+
+  useEffect(() => {
+    // Checks if schema has at least one attribute img or video.
+    if (attributes.length > 0 && !attributes.includes('img' || 'video')) {
+      setImportErrors((state) => [
+        ...state,
+        ...[
+          {
+            index: 0,
+            title: 'Invalid schema',
+            message:
+              'Your schema must contain at least one "img" or "video" attribute.',
+          },
+        ],
+      ]);
+    }
+
+    const attributesData = [];
+    const defaultHeaders = [
+      'max_supply',
+      'burnable',
+      'transferable',
+      'sysflag',
+    ];
+    const attributeTypeOptions = [
+      'bool',
+      'ipfs',
+      'float',
+      'image',
+      'string',
+      'double',
+      'int8',
+      'int16',
+      'int32',
+      'int64',
+      'uint8',
+      'uint16',
+      'uint32',
+      'uint64',
+    ];
+
+    // Checks if any of the schema attributes are invalid.
+    if (dataTypes) {
+      for (const element in dataTypes) {
+        if (!attributeTypeOptions.includes(dataTypes[element])) {
+          if (dataTypes[element] && element !== 'sysflag') {
+            setImportErrors((state) => [
+              ...state,
+              ...[
+                {
+                  index: 0,
+                  title: 'Invalid datatype',
+                  message: `Property "${element}" has an invalid datatype "${dataTypes[element]}"`,
+                },
+              ],
+            ]);
+          }
+        }
+      }
+    }
+
+    attributes.map((attribute) => {
+      attributesData.push({
+        name: attribute,
+        type: dataTypes[`${attribute}`],
+      });
+    });
+
+    setSchemaAttributes(attributesData);
+
+    const templateRows = rows
+      .filter((row) => {
+        const keys = Object.keys(rows[0]);
+
+        if (keys.every((key) => row[key] === null)) {
+          return false;
+        }
+
+        for (const key in row) {
+          if (
+            key === null ||
+            (!attributes.includes(key) && !defaultHeaders.includes(key)) ||
+            key === 'sysflag'
+          ) {
+            delete row[key];
+          }
+        }
+
+        const values = Object.values(row).filter((val) => val !== null);
+
+        if (values.length === 0) {
+          return false;
+        }
+
+        return true;
+      })
+      .splice(headersLength);
+
+    const suggestions = suggestionDataTypes({
+      dataTypes: dataTypes,
+      templates: templateRows,
+    });
+
+    if (suggestions) {
+      setHints(suggestions);
+    }
+
+    // Checks if there is a missing property at the CSV.
+    templateRows.map((row, index) => {
+      for (const key in row) {
+        if (key === '' && row[key]) {
+          console.log(row[key]);
+          setImportErrors((state) => [
+            ...state,
+            ...[
+              {
+                index: index,
+                title: 'Missing property',
+                message: `There is an empty property with a value at row "${
+                  index + headersLength + 1
+                }" of the CSV.`,
+              },
+            ],
+          ]);
+        }
+      }
+    });
+
+    // Checks if a unique attribute is duplicated.
+    if (uniques) {
+      Object.keys(uniques).filter((item) => {
+        if (uniques[item] && item !== 'sysflag') {
+          const duplicates = [];
+          const seenValues = {};
+          const rowsWithDuplicates = [];
+
+          templateRows.forEach((element) => {
+            const value = element[item];
+            if (seenValues[value]) {
+              if (duplicates.indexOf(value) === -1) {
+                duplicates.push(value);
+              }
+            } else {
+              seenValues[value] = true;
+            }
+          });
+
+          templateRows.filter((element, index) => {
+            const value = element[item];
+            const templateRowIndex = index + 1;
+            if (duplicates.indexOf(value) !== -1) {
+              rowsWithDuplicates.push(templateRowIndex + headersLength + 1);
+            }
+          });
+
+          if (duplicates.length > 0 && rowsWithDuplicates.length > 0) {
+            function formatRowsWithDuplicates(numbers) {
+              if (numbers.length === 1) return numbers[0].toString();
+              return (
+                numbers.slice(0, -1).join(', ') +
+                (numbers.length > 2 ? ',' : '') +
+                ' and ' +
+                numbers[numbers.length - 1]
+              );
+            }
+
+            rowsWithDuplicates.forEach((rowIndex) => {
+              setImportErrors((state) => [
+                ...state,
+                ...[
+                  {
+                    index: rowIndex - headersLength - 1,
+                    title: 'Unique property',
+                    message: `Property "${item}" has the value "${
+                      duplicates[0]
+                    }" repeated at rows "${formatRowsWithDuplicates(
+                      rowsWithDuplicates
+                    )}" of the CSV.`,
+                  },
+                ],
+              ]);
+            });
+          }
+        }
+      });
+    }
+
+    templateRows.map((template, index) => {
+      let newTemplate = {};
+      const templateRowIndex = index + 1;
+
+      // Checks if a required attribute is empty.
+      Object.keys(template).map((item) => {
+        if (required[item] && !template[item]) {
+          setImportErrors((state) => [
+            ...state,
+            ...[
+              {
+                index: templateRowIndex,
+                type: 'required',
+                property: item,
+                title: 'Required property',
+                message: `Missing required attribute "${item}" at row "${
+                  templateRowIndex + headersLength + 1
+                }" of the CSV.`,
+              },
+            ],
+          ]);
+        }
+
+        if (!defaultHeaders.includes(item) && attributesData.length > 0) {
+          const { type } = attributesData.filter(
+            (element) => element.name === item
+          )[0];
+
+          newTemplate = {
+            ...newTemplate,
+            ...{
+              [item]: {
+                value: template[item],
+                type: type,
+              },
+            },
+          };
+        } else {
+          newTemplate = { ...newTemplate, ...{ [item]: template[item] } };
+        }
+      });
+
+      setTemplates((state) => [...state, ...[newTemplate]]);
+    });
+  }, [rows, attributes, dataTypes, required, uniques, headersLength]);
+
+  useEffect(() => {
+    async function handleActions() {
+      if (
+        fileName &&
+        collectionName &&
+        ual &&
+        templates.length > 0 &&
+        schemaAttributes.length > 0
+      ) {
+        const newActions = [];
+        const schemaInfo = await checkIfSchemaExists({
+          chainKey,
+          collectionName,
+          schemaName: fileName,
+        });
+
+        if (!schemaInfo.status) {
+          const createSchema = {
+            account: 'atomicassets',
+            name: 'createschema',
+            authorization: [
+              {
+                actor: ual.activeUser.accountName,
+                permission: ual.activeUser.requestPermission,
+              },
+            ],
+            data: {
+              authorized_creator: ual.activeUser.accountName,
+              collection_name: collectionName,
+              schema_name: fileName,
+              schema_format: schemaAttributes,
+            },
+          };
+
+          newActions.push(createSchema);
+        } else {
+          setExistentSchemaInfo(schemaInfo);
+        }
+
+        await templates.map(async (template, index) => {
+          const immutableDataList = [];
+          const immutableAttributes = {};
+
+          for (const key in template) {
+            if (
+              key !== 'burnable' &&
+              key !== 'max_supply' &&
+              key !== 'transferable'
+            ) {
+              const attributeError = validateDataType({
+                data: template[key],
+                attribute: key,
+                index: index,
+                headersLength: headersLength + 1,
+              });
+
+              if (attributeError) {
+                setImportErrors((state) => [...state, ...[attributeError]]);
+              }
+
+              immutableDataList.push({ name: key, type: template[key].type });
+              immutableAttributes[key] = template[key].value;
+            }
+          }
+
+          const immutableData = await handleAttributesData({
+            attributes: immutableAttributes,
+            dataList: immutableDataList,
+          });
+
+          if (immutableData.length > 0) {
+            const createTemplate = {
+              account: 'atomicassets',
+              name: 'createtempl',
+              authorization: [
+                {
+                  actor: ual.activeUser.accountName,
+                  permission: ual.activeUser.requestPermission,
+                },
+              ],
+              data: {
+                authorized_creator: ual.activeUser.accountName,
+                collection_name: collectionName,
+                schema_name: fileName,
+                transferable: template.transferable,
+                burnable: template.burnable,
+                max_supply: template.max_supply,
+                immutable_data: immutableData,
+              },
+            };
+
+            newActions.push(createTemplate);
+          }
+        });
+
+        setActions(newActions);
+      }
+    }
+    handleActions();
+  }, [
+    schemaAttributes,
+    collectionName,
+    fileName,
+    templates,
+    attributes,
+    headersLength,
+    chainKey,
+    ual,
+  ]);
+
   const handleOnChange = (event) => {
     event.preventDefault();
 
+    setRows([]);
+    setHints([]);
+    setActions([]);
+    setUniques({});
+    setRequired({});
+    setFileName('');
+    setDataTypes({});
+    setTemplates([]);
+    setAttributes([]);
+    setImportErrors([]);
+    setHeadersLength(0);
+    setSchemaAttributes([]);
+
     const file = event.target.files[0];
 
-    if (file) {
-      const fileReader = new FileReader();
+    if (!file) return;
 
-      setFileName(file.name.split('.')[0]);
+    const reader = new FileReader();
 
-      fileReader.onload = () => {
-        handleCSVFile(fileReader.result);
-      };
+    const index = file.name.lastIndexOf('.csv');
+    setFileName(file.name.substring(0, index));
 
-      fileReader.readAsText(file);
-    }
+    reader.onload = () => {
+      try {
+        const parsed = Papa.parse(reader.result, {
+          header: true,
+          dynamicTyping: true,
+          skipEmptyLines: true,
+        });
+
+        const defaultHeaders = [
+          'max_supply',
+          'burnable',
+          'transferable',
+          'sysflag',
+        ];
+
+        const fields = parsed.meta.fields;
+        const sysflagIndex = fields.indexOf('sysflag');
+        const newFields = fields.slice(0, sysflagIndex + 1);
+
+        newFields.forEach((field) => {
+          if (!defaultHeaders.includes(field)) {
+            setAttributes((state) => [...state, field]);
+          }
+        });
+
+        const rows = parsed.data
+          .filter((row) => {
+            const isRowNull = Object.values(row).every(
+              (value) => value === null
+            );
+            return !isRowNull;
+          })
+          .map((row) => {
+            const newRow = {};
+            fields.forEach((field) => {
+              newRow[field] = row[field];
+            });
+
+            if (row['sysflag'] === 'datatype') {
+              setDataTypes(row);
+              setHeadersLength((prevLength) => prevLength + 1);
+            }
+
+            if (row['sysflag'] === 'required') {
+              setRequired(row);
+              setHeadersLength((prevLength) => prevLength + 1);
+            }
+
+            if (row['sysflag'] === 'unique') {
+              setUniques(row);
+              setHeadersLength((prevLength) => prevLength + 1);
+            }
+
+            return newRow;
+          });
+
+        setRows(rows);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    reader.onerror = (error) => {
+      console.error(error);
+    };
+
+    reader.readAsText(file);
   };
 
   return (
@@ -588,30 +669,150 @@ function Import({ ual }: ImportProps) {
           <div className="flex flex-col gap-4">
             <h1 className="headline-1">{pluginInfo.name}</h1>
             <span className="body-1">{pluginInfo.description}</span>
+            <span className="body-1">
+              For file specification, see{' '}
+              <a
+                href="https://github.com/FACINGS/collection-manager/blob/main/docs/plugin-import.md"
+                target="_blank"
+                rel="noreferrer"
+                className="font-bold"
+              >
+                Import Plugin Documentation
+              </a>
+              {'.'}
+            </span>
           </div>
-          <form
-            onSubmit={handleSubmit(onSubmit)}
-            className="flex flex-col gap-16"
-          >
-            <div className="flex gap-4 border-b pb-4 my-4 border-neutral-700 w-fit max-w-sm">
-              <label className="flex flex-row items-center">
-                <input
-                  {...register('csvFile')}
-                  type="file"
-                  accept=".csv"
-                  onChange={handleOnChange}
-                  className="w-full file:hidden"
+          {hasRemainingTransactions ? (
+            <>
+              {transactionBatch?.length > 0 && actions.length === 0 ? (
+                <div className="flex flex-col gap-8">
+                  <div className="flex flex-row items-center p-8 gap-4 bg-yellow-50 text-neutral-900 rounded-md w-full">
+                    <div className="text-yellow-600 p-3.5 rounded-full bg-yellow-400/10">
+                      <WarningCircle size={28} />
+                    </div>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-col">
+                        <span className="title-1">Transaction Batch</span>
+                        <span className="body-2">{`It appears that you have a batch of transactions that weren't replicated to the chain. Select continue to review imported data or clear to start a new import.`}</span>
+                      </div>
+                      <div className="flex flex-row gap-4">
+                        <button
+                          className="btn btn-solid w-fit bg-neutral-900 text-white border-neutral-900 hover:text-white"
+                          onClick={() =>
+                            continueImportBatchTransactions({
+                              transactionBatch,
+                              setActions,
+                            })
+                          }
+                        >
+                          Continue
+                        </button>
+                        <button
+                          className="btn btn-outline w-fit hover:text-white"
+                          onClick={() =>
+                            clearBatch(setHasRemainingTransactions)
+                          }
+                        >
+                          Clear batch
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {actions.length > 0 && (
+                    <Review
+                      actions={actions}
+                      errors={importErrors}
+                      schema={existentSchemaInfo['schema']}
+                    />
+                  )}
+                  <button onClick={() => onSubmit()} className="btn w-fit">
+                    {pluginInfo.name}
+                  </button>
+                </>
+              )}
+            </>
+          ) : (
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              className="flex flex-col gap-16"
+            >
+              <div className="flex gap-4 border-b pb-4 my-4 border-neutral-700 w-fit max-w-sm">
+                <label className="flex flex-row items-center">
+                  <input
+                    {...register('csvFile')}
+                    type="file"
+                    accept=".csv"
+                    onChange={handleOnChange}
+                    className="w-full file:hidden"
+                  />
+                  <div className="btn btn-small">Select&nbsp;File</div>
+                </label>
+              </div>
+
+              {hints.length > 0 && (
+                <div className="flex flex-col gap-4">
+                  {hints.map((item, index) => {
+                    return (
+                      <div
+                        key={index}
+                        className="flex flex-row items-center p-8 gap-4 bg-yellow-50 text-neutral-900 rounded-md w-full"
+                      >
+                        <div className="text-yellow-600 p-3.5 rounded-full bg-yellow-400/10">
+                          <WarningCircle size={28} />
+                        </div>
+                        <div className="flex flex-col">
+                          <>
+                            <span className="title-1">{item?.title}</span>
+                            <span className="body-2">{item?.message}</span>
+                          </>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {actions.length > 25 && (
+                <div className="flex flex-col gap-8">
+                  <div className="flex flex-row items-center p-8 gap-4 bg-yellow-50 text-neutral-900 rounded-md w-full">
+                    <div className="text-yellow-600 p-3.5 rounded-full bg-yellow-400/10">
+                      <WarningCircle size={28} />
+                    </div>
+                    <div className="flex flex-col">
+                      <>
+                        <span className="title-1">Transaction Batch</span>
+                        <span className="body-2">{`This process was batched into ${transactions.length} transactions because of the amount of actions, this means that you will have to sign each transaction. You can also change the amount of actions per batch using the batch size selection.`}</span>
+                      </>
+                    </div>
+                  </div>
+                  <Select
+                    onChange={(option) => setSelectedBatchSizeOption(option)}
+                    label="Batch size"
+                    selectedValue={batchOptions[0].value}
+                    options={batchOptions}
+                  />
+                </div>
+              )}
+
+              {actions.length > 0 && (
+                <Review
+                  actions={actions}
+                  errors={importErrors}
+                  schema={existentSchemaInfo['schema']}
                 />
-                <div className="btn btn-small">Upload</div>
-              </label>
-            </div>
+              )}
 
-            {actions.length > 0 && <Review actions={actions} />}
-
-            <button className="btn w-fit" disabled={!fileName}>
-              {pluginInfo.name}
-            </button>
-          </form>
+              <button
+                className="btn w-fit"
+                disabled={!fileName || importErrors.length > 0}
+              >
+                {pluginInfo.name}
+              </button>
+            </form>
+          )}
         </div>
       </div>
       <Modal ref={modalRef} title={modal.title}>

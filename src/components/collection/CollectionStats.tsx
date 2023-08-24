@@ -233,28 +233,12 @@ export function CollectionStats({ stats, collection, socials }: CollectionStatsP
     <section className="container">
       <div className="flex flex-col py-8 gap-12">
         <h2 className="headline-2">{collectionTabs[0].name}</h2>
+
         <div className="flex flex-col md:flex-row gap-24">
           <div className="flex-1">
             <h3 className="headline-3 mb-4">Description</h3>
             <p className="body-1">{collection.data.description}</p>
           </div>
-
-
-
-          {chainKey !== 'proton-test' && (
-            <div className="flex-1">
-              <h3 className="headline-3 mb-4">Abstrakts NFT Manager Features</h3>
-              {features.map(([label, value]) => (
-                <div
-                  key={label}
-                  className="flex justify-between py-3 body-2 text-white border-b border-neutral-700"
-                >
-                  <span>{label}</span>
-                  <span className="font-bold">{value}</span>
-                </div>
-              ))}
-            </div>
-          )}
 
 
           <div className="flex-1">
@@ -269,8 +253,28 @@ export function CollectionStats({ stats, collection, socials }: CollectionStatsP
               </div>
             ))}
           </div>
+
+
         </div>
+        
         <div className="flex flex-col md:flex-row gap-24">
+        <div className="flex-1">
+            <h3 className="headline-3 mb-4">Authorized accounts</h3>
+            <div className="flex flex-row gap-2 flex-wrap">
+              {collection.authorized_accounts.map((item, index) => (
+                <span key={item} className="body-1">
+                  {item}
+                  {index !== collection.authorized_accounts.length - 1
+                    ? ','
+                    : '.'}
+                </span>
+              ))}
+            </div>
+          </div>
+          </div>
+
+        <div className="flex flex-col md:flex-row gap-24">
+
           {hasSocials && (
             <div className="flex-1">
               <h3 className="headline-3 mb-4">Social medias</h3>
@@ -298,9 +302,9 @@ export function CollectionStats({ stats, collection, socials }: CollectionStatsP
 
         </div>
 
-        {chainKey !== 'proton-test' && (
+        {chainKey !== 'xprnetwork-test' && (
           <div className="flex-1">
-            <h3 className="headline-3 mb-4">Proton Markets</h3>
+            <h3 className="headline-3 mb-4">XPR Markets</h3>
             {market.map((item, index) => {
               return (
                 <a
